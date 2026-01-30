@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 
+// Backend API URL - Change this between development and production
+const API_URL = 'https://trackit-ro60.onrender.com';
+
 function App() {
   const [shareCode, setShareCode] = useState('');
   const [message, setMessage] = useState('');
@@ -15,7 +18,7 @@ function App() {
   // Fetch all bets from backend
   const fetchBets = async () => {
     try {
-      const response = await fetch('http://localhost:3000/bets');
+      const response = await fetch(`${API_URL}/bets`);
       const data = await response.json();
       setBets(data.bets || []);
     } catch (error) {
@@ -37,7 +40,7 @@ function App() {
     setMessage('');
 
     try {
-      const response = await fetch('http://localhost:3000/track-bet', {
+      const response = await fetch(`${API_URL}/track-bet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ shareCode: shareCode.trim() })
@@ -55,7 +58,7 @@ function App() {
       
     } catch (error) {
       console.error('Error:', error);
-      setMessage('❌ Could not connect to server. Is the backend running?');
+      setMessage('❌ Could not connect to server. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -64,7 +67,7 @@ function App() {
   // View bet details
   const handleViewBet = async (id) => {
     try {
-      const response = await fetch(`http://localhost:3000/bets/${id}`);
+      const response = await fetch(`${API_URL}/bets/${id}`);
       const data = await response.json();
       
       if (data.success) {
@@ -81,7 +84,7 @@ function App() {
     if (!window.confirm('Delete this bet?')) return;
 
     try {
-      const response = await fetch(`http://localhost:3000/bets/${id}`, {
+      const response = await fetch(`${API_URL}/bets/${id}`, {
         method: 'DELETE'
       });
       
