@@ -2,9 +2,6 @@ import { useState, useEffect } from 'react';
 
 const API_URL = window.location.origin;
 
-// Later in code:
-fetch(`${API_URL}/bets`)  // Works everywhere!
-
 function App() {
   const [shareCode, setShareCode] = useState('');
   const [message, setMessage] = useState('');
@@ -29,7 +26,7 @@ function App() {
     }
   };
 
-  // Submit new bet - NOW CALLS SPORTYBET FROM CLIENT SIDE
+  // Submit new bet - simplified version that calls backend
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -39,80 +36,28 @@ function App() {
     }
 
     setLoading(true);
-    setMessage('Fetching bet from Sportybet...');
+    setMessage('Tracking bet...');
 
     try {
-      // Fetch from Sportybet API (client-side to avoid CORS)
-      console.log(`🔍 Fetching bet: ${shareCode.trim()}`);
-      const timestamp = Date.now();
-      // replace the sportyUrl line with:
-const sportyUrl = `https://corsproxy.io/?${encodeURIComponent(`https://www.sportybet.com/api/ng/orders/share/${shareCode.trim()}?_t=${timestamp}`)}`;
-      
-      const sportyResponse = await fetch(sportyUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json, text/plain, */*',
-          'Accept-Language': 'en-US,en;q=0.9'
-        }
-      });
-      
-      console.log(`📡 Sportybet response status: ${sportyResponse.status}`);
-      
-      if (!sportyResponse.ok) {
-        throw new Error(`Sportybet API returned status ${sportyResponse.status}`);
-      }
-      
-      const sportyData = await sportyResponse.json();
-      console.log(`📦 Sportybet data:`, sportyData);
-      
-      // Check if the response is valid
-      if (!sportyData) {
-        throw new Error('No data received from Sportybet');
-      }
-      
-      if (sportyData.code !== 0) {
-        setMessage(`❌ ${sportyData.msg || 'Invalid share code or bet not found'}`);
-        setLoading(false);
-        return;
-      }
-      
-      if (!sportyData.data) {
-        setMessage('❌ Bet data not found. The share code may be invalid.');
-        setLoading(false);
-        return;
-      }
-      
-      // Step 2: Send to backend to save
-      setMessage('Saving bet to database...');
-      const response = await fetch(`${API_URL}/save-bet`, {
+      const response = await fetch(`${API_URL}/track-bet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          shareCode: shareCode.trim(),
-          betData: sportyData.data 
-        })
+        body: JSON.stringify({ shareCode: shareCode.trim() })
       });
       
       const data = await response.json();
       
       if (data.success) {
         setMessage(`✅ Bet tracked successfully: ${shareCode.trim()}`);
-        setShareCode(''); // Clear input
-        fetchBets(); // Refresh the list
+        setShareCode('');
+        fetchBets();
       } else {
-        setMessage(`❌ Error saving bet: ${data.error || 'Unknown error'}`);
+        setMessage(`❌ ${data.error || 'Failed to track bet'}`);
       }
       
     } catch (error) {
       console.error('Error tracking bet:', error);
-      
-      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-        setMessage('❌ Network error. Please check your internet connection.');
-      } else if (error.message.includes('CORS')) {
-        setMessage('❌ CORS error. Please make sure the share code is valid.');
-      } else {
-        setMessage(`❌ Error: ${error.message}`);
-      }
+      setMessage('❌ Network error. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -147,7 +92,7 @@ const sportyUrl = `https://corsproxy.io/?${encodeURIComponent(`https://www.sport
       if (data.success) {
         setMessage('✅ Bet deleted');
         setSelectedBet(null);
-        fetchBets(); // Refresh the list
+        fetchBets();
       }
     } catch (error) {
       console.error('Error deleting bet:', error);

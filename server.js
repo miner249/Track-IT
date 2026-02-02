@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -57,18 +58,58 @@ function initializeDatabase() {
   });
 }
 
-// NEW ENDPOINT: Save bet data (called from frontend after frontend fetches from Sportybet)
-app.post('/save-bet', async (req, res) => {
-  const { shareCode, betData } = req.body;
+// NEW ENDPOINT: Track bet (fetches from Sportybet AND saves to DB)
+app.post('/track-bet', async (req, res) => {
+  const { shareCode } = req.body;
 
-  if (!shareCode || !betData) {
-    return res.json({ success: false, error: 'Share code and bet data are required' });
+  if (!shareCode) {
+    return res.json({ success: false, error: 'Share code is required' });
   }
 
-  console.log(`\n💾 Saving bet: ${shareCode}`);
-  console.log(`📊 Bet data received:`, JSON.stringify(betData, null, 2).substring(0, 500) + '...');
+  console.log(`\n🔍 Fetching bet from Sportybet: ${shareCode}`);
 
   try {
+    // Fetch from Sportybet API (server-side, no CORS issues)
+    const timestamp = Date.now();
+    const sportyUrl = `https://www.sportybet.com/api/ng/orders/share/${shareCode.trim()}?_t=${timestamp}`;
+    
+    const sportyResponse = await fetch(sportyUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.sportybet.com/'
+      }
+    });
+
+    if (!sportyResponse.ok) {
+      console.error(`❌ Sportybet API returned status ${sportyResponse.status}`);
+      return res.json({ 
+        success: false, 
+        error: `Failed to fetch bet (Status: ${sportyResponse.status})` 
+      });
+    }
+
+    const sportyData = await sportyResponse.json();
+    console.log(`📦 Sportybet response:`, sportyData);
+
+    if (sportyData.code !== 0) {
+      return res.json({ 
+        success: false, 
+        error: sportyData.msg || 'Invalid share code or bet not found' 
+      });
+    }
+
+    if (!sportyData.data) {
+      return res.json({ 
+        success: false, 
+        error: 'Bet data not found. The share code may be invalid.' 
+      });
+    }
+
+    const betData = sportyData.data;
+
     // Save to database
     const betInsert = `
       INSERT OR REPLACE INTO bets (share_code, total_odds, stake, potential_win, currency, raw_data)
@@ -78,7 +119,7 @@ app.post('/save-bet', async (req, res) => {
     db.run(
       betInsert,
       [
-        shareCode,
+        shareCode.trim(),
         betData.totalOdds || betData.odds,
         betData.stake,
         betData.maxWinAmount || betData.potentialWin,
@@ -94,9 +135,8 @@ app.post('/save-bet', async (req, res) => {
         const betId = this.lastID;
         console.log(`✅ Bet saved with ID: ${betId}`);
 
-        // Parse and save matches
         const outcomes = betData.outcomes || [];
-        
+
         if (outcomes.length === 0) {
           console.log('⚠️ No outcomes/matches found in bet');
           return res.json({
@@ -108,9 +148,8 @@ app.post('/save-bet', async (req, res) => {
 
         console.log(`📋 Processing ${outcomes.length} matches...`);
         let processedMatches = 0;
-        let errors = 0;
 
-        outcomes.forEach((outcome, index) => {
+        outcomes.forEach((outcome) => {
           const matchInsert = `
             INSERT INTO matches (
               bet_id, match_id, home_team, away_team, league, 
@@ -134,22 +173,20 @@ app.post('/save-bet', async (req, res) => {
             ],
             (err) => {
               if (err) {
-                console.error(`❌ Error inserting match ${index + 1}:`, err);
-                errors++;
+                console.error(`❌ Error inserting match:`, err);
               } else {
-                console.log(`✅ Match ${index + 1} saved`);
+                console.log(`✅ Match saved`);
               }
 
               processedMatches++;
 
-              // Send response after all matches are processed
               if (processedMatches === outcomes.length) {
-                console.log(`🎉 Processing complete! ${outcomes.length - errors} matches saved, ${errors} errors\n`);
+                console.log(`🎉 All matches processed!\n`);
                 res.json({
                   success: true,
                   message: 'Bet tracked successfully',
                   betId,
-                  matchCount: outcomes.length - errors
+                  matchCount: outcomes.length
                 });
               }
             }
@@ -159,10 +196,10 @@ app.post('/save-bet', async (req, res) => {
     );
 
   } catch (error) {
-    console.error('❌ Error saving bet:', error);
+    console.error('❌ Error tracking bet:', error);
     return res.json({ 
       success: false,
-      error: 'Server error while saving bet'
+      error: error.message || 'Server error while tracking bet'
     });
   }
 });
