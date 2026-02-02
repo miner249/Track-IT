@@ -27,7 +27,7 @@ function App() {
     }
   };
 
-  // Submit new bet
+  // Submit new bet - NOW CALLS SPORTYBET FROM CLIENT SIDE
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -37,28 +37,79 @@ function App() {
     }
 
     setLoading(true);
-    setMessage('');
+    setMessage('Fetching bet from Sportybet...');
 
     try {
-      const response = await fetch(`${API_URL}/track-bet`, {
+      // Step 1: Fetch from Sportybet API (client-side to avoid CORS)
+      console.log(`🔍 Fetching bet: ${shareCode.trim()}`);
+      const timestamp = Date.now();
+      const sportyUrl = `https://www.sportybet.com/api/ng/orders/share/${shareCode.trim()}?_t=${timestamp}`;
+      
+      const sportyResponse = await fetch(sportyUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'en-US,en;q=0.9'
+        }
+      });
+      
+      console.log(`📡 Sportybet response status: ${sportyResponse.status}`);
+      
+      if (!sportyResponse.ok) {
+        throw new Error(`Sportybet API returned status ${sportyResponse.status}`);
+      }
+      
+      const sportyData = await sportyResponse.json();
+      console.log(`📦 Sportybet data:`, sportyData);
+      
+      // Check if the response is valid
+      if (!sportyData) {
+        throw new Error('No data received from Sportybet');
+      }
+      
+      if (sportyData.code !== 0) {
+        setMessage(`❌ ${sportyData.msg || 'Invalid share code or bet not found'}`);
+        setLoading(false);
+        return;
+      }
+      
+      if (!sportyData.data) {
+        setMessage('❌ Bet data not found. The share code may be invalid.');
+        setLoading(false);
+        return;
+      }
+      
+      // Step 2: Send to backend to save
+      setMessage('Saving bet to database...');
+      const response = await fetch(`${API_URL}/save-bet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shareCode: shareCode.trim() })
+        body: JSON.stringify({ 
+          shareCode: shareCode.trim(),
+          betData: sportyData.data 
+        })
       });
       
       const data = await response.json();
       
       if (data.success) {
-        setMessage(`✅ Bet tracked: ${shareCode}`);
+        setMessage(`✅ Bet tracked successfully: ${shareCode.trim()}`);
         setShareCode(''); // Clear input
         fetchBets(); // Refresh the list
       } else {
-        setMessage(`❌ ${data.error || 'Error tracking bet'}`);
+        setMessage(`❌ Error saving bet: ${data.error || 'Unknown error'}`);
       }
       
     } catch (error) {
-      console.error('Error:', error);
-      setMessage('❌ Could not connect to server. Please try again.');
+      console.error('Error tracking bet:', error);
+      
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        setMessage('❌ Network error. Please check your internet connection.');
+      } else if (error.message.includes('CORS')) {
+        setMessage('❌ CORS error. Please make sure the share code is valid.');
+      } else {
+        setMessage(`❌ Error: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -149,7 +200,7 @@ function App() {
               fontWeight: 'bold'
             }}
           >
-            {loading ? '...' : 'Track'}
+            {loading ? 'Tracking...' : 'Track Bet'}
           </button>
         </div>
       </form>
