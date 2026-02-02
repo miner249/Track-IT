@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 
-// Backend API URL - Change this between development and production
-const API_URL = 'https://trackit-ro60.onrender.com';
+const API_URL = window.location.origin;
+
+// Later in code:
+fetch(`${API_URL}/bets`)  // Works everywhere!
 
 function App() {
   const [shareCode, setShareCode] = useState('');
