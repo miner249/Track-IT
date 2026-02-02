@@ -11,6 +11,12 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Disable caching for development
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  next();
+});
+
 // Initialize SQLite Database
 const db = new sqlite3.Database('./sportybet.db', (err) => {
   if (err) {
@@ -58,7 +64,7 @@ function initializeDatabase() {
   });
 }
 
-// NEW ENDPOINT: Track bet (fetches from Sportybet AND saves to DB)
+// Track bet endpoint - fetches from Sportybet AND saves to DB
 app.post('/track-bet', async (req, res) => {
   const { shareCode } = req.body;
 
@@ -66,12 +72,14 @@ app.post('/track-bet', async (req, res) => {
     return res.json({ success: false, error: 'Share code is required' });
   }
 
-  console.log(`\n🔍 Fetching bet from Sportybet: ${shareCode}`);
+  console.log(`\n🔍 [SERVER] Fetching bet from Sportybet: ${shareCode}`);
 
   try {
     // Fetch from Sportybet API (server-side, no CORS issues)
     const timestamp = Date.now();
     const sportyUrl = `https://www.sportybet.com/api/ng/orders/share/${shareCode.trim()}?_t=${timestamp}`;
+    
+    console.log(`📡 [SERVER] Calling: ${sportyUrl}`);
     
     const sportyResponse = await fetch(sportyUrl, {
       method: 'GET',
@@ -79,20 +87,23 @@ app.post('/track-bet', async (req, res) => {
         'Accept': 'application/json, text/plain, */*',
         'Accept-Language': 'en-US,en;q=0.9',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://www.sportybet.com/'
+        'Referer': 'https://www.sportybet.com/',
+        'Origin': 'https://www.sportybet.com'
       }
     });
 
+    console.log(`📊 [SERVER] Sportybet response status: ${sportyResponse.status}`);
+
     if (!sportyResponse.ok) {
-      console.error(`❌ Sportybet API returned status ${sportyResponse.status}`);
+      console.error(`❌ [SERVER] Sportybet API returned status ${sportyResponse.status}`);
       return res.json({ 
         success: false, 
-        error: `Failed to fetch bet (Status: ${sportyResponse.status})` 
+        error: `Failed to fetch bet from Sportybet (Status: ${sportyResponse.status})` 
       });
     }
 
     const sportyData = await sportyResponse.json();
-    console.log(`📦 Sportybet response:`, sportyData);
+    console.log(`✅ [SERVER] Sportybet data received, code: ${sportyData.code}`);
 
     if (sportyData.code !== 0) {
       return res.json({ 
@@ -128,17 +139,17 @@ app.post('/track-bet', async (req, res) => {
       ],
       function(err) {
         if (err) {
-          console.error('❌ Error inserting bet:', err);
+          console.error('❌ [SERVER] Error inserting bet:', err);
           return res.json({ success: false, error: 'Database error while saving bet' });
         }
 
         const betId = this.lastID;
-        console.log(`✅ Bet saved with ID: ${betId}`);
+        console.log(`✅ [SERVER] Bet saved with ID: ${betId}`);
 
         const outcomes = betData.outcomes || [];
 
         if (outcomes.length === 0) {
-          console.log('⚠️ No outcomes/matches found in bet');
+          console.log('⚠️ [SERVER] No outcomes/matches found in bet');
           return res.json({
             success: true,
             message: 'Bet tracked successfully (no matches found)',
@@ -146,7 +157,7 @@ app.post('/track-bet', async (req, res) => {
           });
         }
 
-        console.log(`📋 Processing ${outcomes.length} matches...`);
+        console.log(`📋 [SERVER] Processing ${outcomes.length} matches...`);
         let processedMatches = 0;
 
         outcomes.forEach((outcome) => {
@@ -173,15 +184,13 @@ app.post('/track-bet', async (req, res) => {
             ],
             (err) => {
               if (err) {
-                console.error(`❌ Error inserting match:`, err);
-              } else {
-                console.log(`✅ Match saved`);
+                console.error(`❌ [SERVER] Error inserting match:`, err);
               }
 
               processedMatches++;
 
               if (processedMatches === outcomes.length) {
-                console.log(`🎉 All matches processed!\n`);
+                console.log(`🎉 [SERVER] All matches processed!\n`);
                 res.json({
                   success: true,
                   message: 'Bet tracked successfully',
@@ -196,7 +205,7 @@ app.post('/track-bet', async (req, res) => {
     );
 
   } catch (error) {
-    console.error('❌ Error tracking bet:', error);
+    console.error('❌ [SERVER] Error tracking bet:', error);
     return res.json({ 
       success: false,
       error: error.message || 'Server error while tracking bet'
@@ -262,18 +271,34 @@ app.delete('/bets/:id', (req, res) => {
 
 // Health check route
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Sportybet Tracker API is running' });
+  res.json({ status: 'OK', message: 'Track It API is running' });
 });
 
 // Serve static files from the React app (AFTER all API routes)
 const buildPath = path.join(__dirname, 'client', 'dist');
-app.use(express.static(buildPath));
 
-// The "catchall" handler: for any request that doesn't match API routes,
-// send back the React app's index.html file.
-app.use((req, res) => {
-  res.sendFile(path.join(buildPath, 'index.html'));
-});
+// Check if build path exists
+const fs = require('fs');
+if (fs.existsSync(buildPath)) {
+  console.log('✅ Found client build directory');
+  app.use(express.static(buildPath));
+  
+  // The "catchall" handler: for any request that doesn't match API routes,
+  // send back the React app's index.html file.
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(buildPath, 'index.html'));
+  });
+} else {
+  console.warn('⚠️  Client build directory not found at:', buildPath);
+  console.warn('⚠️  Run "npm run build" to build the frontend');
+  
+  app.get('*', (req, res) => {
+    res.json({ 
+      error: 'Frontend not built yet. Run: npm run build',
+      buildPath: buildPath 
+    });
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
