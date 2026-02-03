@@ -65,7 +65,7 @@ function initializeDatabase() {
   });
 }
 
-// Track bet endpoint - fetches from Sportybet AND saves to DB
+// Track bet endpoint
 app.post('/track-bet', async (req, res) => {
   const { shareCode } = req.body;
 
@@ -78,8 +78,6 @@ app.post('/track-bet', async (req, res) => {
   try {
     const timestamp = Date.now();
     const sportyUrl = `https://www.sportybet.com/api/ng/orders/share/${shareCode.trim()}?_t=${timestamp}`;
-
-    console.log(`📡 [SERVER] Calling: ${sportyUrl}`);
 
     const sportyResponse = await fetch(sportyUrl, {
       method: 'GET',
@@ -98,33 +96,80 @@ app.post('/track-bet', async (req, res) => {
 
     const sportyData = await sportyResponse.json();
 
-    // Check for error code if it exists
     if (sportyData.code !== undefined && sportyData.code !== 0) {
       return res.json({ success: false, error: sportyData.msg || 'Invalid share code' });
     }
 
-    // Data is either in sportyData.data or sportyData itself
     const betData = sportyData.data || sportyData;
 
     if (!betData) {
       return res.json({ success: false, error: 'No bet data found' });
     }
 
-    // --- EXTRACT BET INFO FROM ticket ---
+    // Log the TOP-LEVEL keys to find where stake/totalOdds/win might be
+    console.log(`📦 [SERVER] Top-level keys:`, Object.keys(betData));
+    console.log(`📦 [SERVER] ticket keys:`, Object.keys(betData.ticket || {}));
+
     const ticket = betData.ticket || {};
     const outcomes = betData.outcomes || [];
 
-    console.log(`🎫 [SERVER] Ticket:`, JSON.stringify(ticket));
-    console.log(`🎯 [SERVER] Outcomes count: ${outcomes.length}`);
-    if (outcomes.length > 0) {
-      console.log(`🎯 [SERVER] First outcome sample:`, JSON.stringify(outcomes[0]));
-    }
+    // --- EXTRACT ODDS FROM EACH OUTCOME ---
+    // Each outcome has: markets[0].outcomes[0].odds  (the selected outcome's odds)
+    // ticket.selections tells us which outcomeId was picked per match
+    // We multiply all odds together to get totalOdds
+    let totalOdds = 1;
+    const parsedMatches = [];
 
-    const totalOdds = ticket.totalOdds || ticket.odds || 0;
-    const stake = ticket.stake || ticket.stakeAmount || 0;
-    const potentialWin = ticket.maxWinAmount || ticket.potentialWin || ticket.winAmount || 0;
+    outcomes.forEach((outcome, index) => {
+      // Find the selected outcomeId from ticket.selections
+      const selection = ticket.selections ? ticket.selections[index] : null;
+      const selectedOutcomeId = selection ? selection.outcomeId : null;
 
-    console.log(`💰 [SERVER] Odds: ${totalOdds} | Stake: ${stake} | Win: ${potentialWin}`);
+      // Find the matching market and outcome odds
+      let matchOdds = 0;
+      let marketName = 'N/A';
+      let selectionName = 'N/A';
+
+      if (outcome.markets && outcome.markets.length > 0) {
+        const market = outcome.markets[0];
+        marketName = market.desc || market.name || 'N/A';
+
+        if (market.outcomes && market.outcomes.length > 0) {
+          // Find the outcome that matches the selected outcomeId
+          const selectedOutcome = market.outcomes.find(o => o.id === selectedOutcomeId) || market.outcomes[0];
+          matchOdds = parseFloat(selectedOutcome.odds) || 0;
+          selectionName = selectedOutcome.desc || selectedOutcome.name || 'N/A';
+        }
+      }
+
+      totalOdds *= matchOdds;
+
+      // League: sport.category.tournament.name
+      const league = outcome.sport?.category?.tournament?.name || 'Unknown';
+
+      parsedMatches.push({
+        match_id: outcome.eventId || 'N/A',
+        home_team: outcome.homeTeamName || 'Unknown',
+        away_team: outcome.awayTeamName || 'Unknown',
+        league: league,
+        match_time: outcome.estimateStartTime ? new Date(outcome.estimateStartTime).toISOString() : null,
+        selection: selectionName,
+        odds: matchOdds,
+        market_name: marketName,
+        status: outcome.matchStatus || 'pending'
+      });
+    });
+
+    // Round totalOdds to 2 decimal places
+    totalOdds = Math.round(totalOdds * 100) / 100;
+
+    // Stake and potential win — check if they exist anywhere in the response
+    // If not, we set stake to 0 and calculate potential win from totalOdds
+    const stake = betData.stake || ticket.stake || betData.stakeAmount || 0;
+    const potentialWin = betData.maxWinAmount || ticket.maxWinAmount || (stake * totalOdds) || 0;
+
+    console.log(`💰 [SERVER] Total Odds: ${totalOdds} | Stake: ${stake} | Potential Win: ${potentialWin}`);
+    console.log(`⚽ [SERVER] Matches:`, JSON.stringify(parsedMatches, null, 2));
 
     // --- SAVE BET ---
     db.run(
@@ -140,40 +185,36 @@ app.post('/track-bet', async (req, res) => {
         const betId = this.lastID;
         console.log(`✅ [SERVER] Bet saved, ID: ${betId}`);
 
-        // --- SAVE MATCHES ---
-        if (outcomes.length === 0) {
+        if (parsedMatches.length === 0) {
           return res.json({ success: true, message: 'Bet tracked (no matches)', betId });
         }
 
+        // --- SAVE MATCHES ---
         let processed = 0;
 
-        outcomes.forEach((outcome) => {
-          // Each outcome has: event {}, market {}, odds, outcomeAlias, etc.
-          const event = outcome.event || {};
-          const market = outcome.market || {};
-
+        parsedMatches.forEach((match) => {
           db.run(
             `INSERT INTO matches (bet_id, match_id, home_team, away_team, league, match_time, selection, odds, market_name, outcome)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               betId,
-              event.id || outcome.eventId || 'N/A',
-              event.homeName || 'Unknown',
-              event.awayName || 'Unknown',
-              event.leagueName || event.sportName || 'Unknown League',
-              event.matchTime || event.startTime || null,
-              outcome.outcomeAlias || outcome.selectionName || 'N/A',
-              outcome.odds || 0,
-              market.name || market.marketName || 'N/A',
-              outcome.status || 'pending'
+              match.match_id,
+              match.home_team,
+              match.away_team,
+              match.league,
+              match.match_time,
+              match.selection,
+              match.odds,
+              match.market_name,
+              match.status
             ],
             (err) => {
               if (err) console.error(`❌ [SERVER] Error inserting match:`, err);
               processed++;
 
-              if (processed === outcomes.length) {
-                console.log(`🎉 [SERVER] Done! ${outcomes.length} match(es) saved\n`);
-                res.json({ success: true, message: 'Bet tracked successfully', betId, matchCount: outcomes.length });
+              if (processed === parsedMatches.length) {
+                console.log(`🎉 [SERVER] Done! ${parsedMatches.length} match(es) saved\n`);
+                res.json({ success: true, message: 'Bet tracked successfully', betId, matchCount: parsedMatches.length });
               }
             }
           );
