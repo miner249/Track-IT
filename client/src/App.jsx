@@ -55,7 +55,7 @@ const styles = {
     flex: 1,
     minWidth: 0,
     padding: '14px 16px',
-    fontSize: '15px',
+    fontSize: '16px', // 16px prevents iOS zoom — set here directly
     background: '#0f172a',
     border: '2px solid #334155',
     borderRadius: '10px',
@@ -68,7 +68,7 @@ const styles = {
     borderColor: '#4ade80',
   },
   trackBtn: {
-    padding: '14px 24px',
+    padding: '14px 20px',
     fontSize: '15px',
     fontWeight: '700',
     background: 'linear-gradient(135deg, #4ade80, #22c55e)',
@@ -78,6 +78,7 @@ const styles = {
     cursor: 'pointer',
     whiteSpace: 'nowrap',
     transition: 'opacity 0.2s, transform 0.1s',
+    flexShrink: 0, // prevents the button from shrinking on narrow screens
   },
   trackBtnDisabled: {
     opacity: 0.5,
@@ -111,6 +112,7 @@ const styles = {
   // Stats
   statsGrid: {
     display: 'grid',
+    // single column on very small screens via JS — see inline override below
     gridTemplateColumns: 'repeat(3, 1fr)',
     gap: '8px',
     marginBottom: '24px',
@@ -174,12 +176,15 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: '10px',
+    gap: '8px', // gap so badge doesn't overlap long codes
   },
   betCode: {
     fontSize: '16px',
     fontWeight: '700',
     color: '#f1f5f9',
     letterSpacing: '0.5px',
+    minWidth: 0,
+    wordBreak: 'break-all', // long share codes wrap cleanly
   },
   statusBadge: {
     fontSize: '11px',
@@ -188,6 +193,7 @@ const styles = {
     borderRadius: '20px',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
+    flexShrink: 0, // badge never shrinks
   },
   statusPending: {
     background: '#1e3a5f',
@@ -202,6 +208,7 @@ const styles = {
   betInfoItem: {
     display: 'flex',
     flexDirection: 'column',
+    minWidth: '70px', // ensures items don't collapse to nothing
   },
   betInfoLabel: {
     fontSize: '10px',
@@ -272,12 +279,15 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '20px',
+    gap: '8px',
   },
   modalTitle: {
     fontSize: '18px',
     fontWeight: '700',
     margin: 0,
     color: '#f1f5f9',
+    minWidth: 0,
+    wordBreak: 'break-all', // long codes in the modal title wrap
   },
   modalClose: {
     background: '#334155',
@@ -287,6 +297,7 @@ const styles = {
     borderRadius: '8px',
     width: '32px',
     height: '32px',
+    minWidth: '32px', // never shrinks
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -319,11 +330,15 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '10px',
+    gap: '8px',
+    flexWrap: 'wrap', // teams + odds badge wrap on tiny screens
   },
   matchTeams: {
     fontSize: '15px',
     fontWeight: '700',
     color: '#f1f5f9',
+    minWidth: 0,
+    wordBreak: 'break-word',
   },
   matchOddsBadge: {
     background: '#166534',
@@ -332,6 +347,7 @@ const styles = {
     fontWeight: '800',
     padding: '4px 12px',
     borderRadius: '8px',
+    flexShrink: 0,
   },
   matchMeta: {
     display: 'flex',
@@ -376,6 +392,14 @@ function App() {
   const [selectedBet, setSelectedBet] = useState(null);
   const [hoveredBet, setHoveredBet] = useState(null);
   const [inputFocused, setInputFocused] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 480);
+
+  // Listen for resize to toggle mobile layout
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 480);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     fetchBets();
@@ -465,6 +489,17 @@ function App() {
     return { ...styles.message, ...styles.messageLoading };
   };
 
+  // Responsive grid columns: 1 col on mobile, 3 on desktop
+  const statsGridStyle = {
+    ...styles.statsGrid,
+    gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+  };
+
+  const modalStatsStyle = {
+    ...styles.modalStatsRow,
+    gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+  };
+
   // ── RENDER ──
   return (
     <div style={styles.app}>
@@ -511,7 +546,7 @@ function App() {
         {message.text && <div style={getMsgStyle()}>{message.text}</div>}
 
         {/* Stats */}
-        <div style={styles.statsGrid}>
+        <div style={statsGridStyle}>
           <div style={styles.statCard}>
             <div style={{ ...styles.statValue, color: '#38bdf8' }}>{bets.length}</div>
             <div style={styles.statLabel}>Total Bets</div>
@@ -600,7 +635,7 @@ function App() {
             </div>
 
             {/* Modal Stats */}
-            <div style={styles.modalStatsRow}>
+            <div style={modalStatsStyle}>
               <div style={styles.modalStatCard}>
                 <div style={{ ...styles.statValue, color: '#4ade80', fontSize: '20px' }}>{selectedBet.total_odds}x</div>
                 <div style={styles.statLabel}>Total Odds</div>
