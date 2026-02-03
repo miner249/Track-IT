@@ -3,6 +3,7 @@ const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fetch = require('node-fetch');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,14 +12,14 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Disable caching for development
+// Disable caching
 app.use((req, res, next) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   next();
 });
 
 // Initialize SQLite Database
-const db = new sqlite3.Database('./sportybet.db', (err) => {
+const db = new sqlite3.Database('./trackit.db', (err) => {
   if (err) {
     console.error('Error opening database:', err);
   } else {
@@ -72,15 +73,14 @@ app.post('/track-bet', async (req, res) => {
     return res.json({ success: false, error: 'Share code is required' });
   }
 
-  console.log(`\n🔍 [SERVER] Fetching bet from Sportybet: ${shareCode}`);
+  console.log(`\n🔍 [SERVER] Fetching bet: ${shareCode}`);
 
   try {
-    // Fetch from Sportybet API (server-side, no CORS issues)
     const timestamp = Date.now();
     const sportyUrl = `https://www.sportybet.com/api/ng/orders/share/${shareCode.trim()}?_t=${timestamp}`;
-    
+
     console.log(`📡 [SERVER] Calling: ${sportyUrl}`);
-    
+
     const sportyResponse = await fetch(sportyUrl, {
       method: 'GET',
       headers: {
@@ -92,115 +92,88 @@ app.post('/track-bet', async (req, res) => {
       }
     });
 
-    console.log(`📊 [SERVER] Sportybet response status: ${sportyResponse.status}`);
-
     if (!sportyResponse.ok) {
-      console.error(`❌ [SERVER] Sportybet API returned status ${sportyResponse.status}`);
-      return res.json({ 
-        success: false, 
-        error: `Failed to fetch bet from Sportybet (Status: ${sportyResponse.status})` 
-      });
+      return res.json({ success: false, error: `Failed to fetch bet (Status: ${sportyResponse.status})` });
     }
 
     const sportyData = await sportyResponse.json();
-    console.log(`✅ [SERVER] Full Sportybet response:`, JSON.stringify(sportyData, null, 2));
 
-    // Check for errors — some responses use "code", some don't
+    // Check for error code if it exists
     if (sportyData.code !== undefined && sportyData.code !== 0) {
-      return res.json({ 
-        success: false, 
-        error: sportyData.msg || 'Invalid share code or bet not found' 
-      });
+      return res.json({ success: false, error: sportyData.msg || 'Invalid share code' });
     }
 
-    // The bet data could be in sportyData.data OR directly in sportyData itself
+    // Data is either in sportyData.data or sportyData itself
     const betData = sportyData.data || sportyData;
 
     if (!betData) {
-      return res.json({ 
-        success: false, 
-        error: 'Bet data not found. The share code may be invalid.' 
-      });
+      return res.json({ success: false, error: 'No bet data found' });
     }
 
-    console.log(`📦 [SERVER] Bet data keys:`, Object.keys(betData));
+    // --- EXTRACT BET INFO FROM ticket ---
+    const ticket = betData.ticket || {};
+    const outcomes = betData.outcomes || [];
 
-    // Save to database
-    const betInsert = `
-      INSERT OR REPLACE INTO bets (share_code, total_odds, stake, potential_win, currency, raw_data)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `;
+    console.log(`🎫 [SERVER] Ticket:`, JSON.stringify(ticket));
+    console.log(`🎯 [SERVER] Outcomes count: ${outcomes.length}`);
+    if (outcomes.length > 0) {
+      console.log(`🎯 [SERVER] First outcome sample:`, JSON.stringify(outcomes[0]));
+    }
 
+    const totalOdds = ticket.totalOdds || ticket.odds || 0;
+    const stake = ticket.stake || ticket.stakeAmount || 0;
+    const potentialWin = ticket.maxWinAmount || ticket.potentialWin || ticket.winAmount || 0;
+
+    console.log(`💰 [SERVER] Odds: ${totalOdds} | Stake: ${stake} | Win: ${potentialWin}`);
+
+    // --- SAVE BET ---
     db.run(
-      betInsert,
-      [
-        shareCode.trim(),
-        betData.totalOdds || betData.odds,
-        betData.stake,
-        betData.maxWinAmount || betData.potentialWin,
-        betData.currencyCode || 'NGN',
-        JSON.stringify(betData)
-      ],
+      `INSERT OR REPLACE INTO bets (share_code, total_odds, stake, potential_win, currency, raw_data)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [shareCode.trim(), totalOdds, stake, potentialWin, 'NGN', JSON.stringify(betData)],
       function(err) {
         if (err) {
           console.error('❌ [SERVER] Error inserting bet:', err);
-          return res.json({ success: false, error: 'Database error while saving bet' });
+          return res.json({ success: false, error: 'Database error saving bet' });
         }
 
         const betId = this.lastID;
-        console.log(`✅ [SERVER] Bet saved with ID: ${betId}`);
+        console.log(`✅ [SERVER] Bet saved, ID: ${betId}`);
 
-        const outcomes = betData.outcomes || [];
-
+        // --- SAVE MATCHES ---
         if (outcomes.length === 0) {
-          console.log('⚠️ [SERVER] No outcomes/matches found in bet');
-          return res.json({
-            success: true,
-            message: 'Bet tracked successfully (no matches found)',
-            betId
-          });
+          return res.json({ success: true, message: 'Bet tracked (no matches)', betId });
         }
 
-        console.log(`📋 [SERVER] Processing ${outcomes.length} matches...`);
-        let processedMatches = 0;
+        let processed = 0;
 
         outcomes.forEach((outcome) => {
-          const matchInsert = `
-            INSERT INTO matches (
-              bet_id, match_id, home_team, away_team, league, 
-              match_time, selection, odds, market_name, outcome
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `;
+          // Each outcome has: event {}, market {}, odds, outcomeAlias, etc.
+          const event = outcome.event || {};
+          const market = outcome.market || {};
 
           db.run(
-            matchInsert,
+            `INSERT INTO matches (bet_id, match_id, home_team, away_team, league, match_time, selection, odds, market_name, outcome)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               betId,
-              outcome.eventId || outcome.matchId,
-              outcome.homeName || outcome.homeTeam,
-              outcome.awayName || outcome.awayTeam,
-              outcome.sportName || outcome.league,
-              outcome.matchTime || outcome.startTime,
-              outcome.outcomeAlias || outcome.selection,
-              outcome.odds,
-              outcome.marketName,
-              outcome.outcome || 'pending'
+              event.id || outcome.eventId || 'N/A',
+              event.homeName || 'Unknown',
+              event.awayName || 'Unknown',
+              event.leagueName || event.sportName || 'Unknown League',
+              event.matchTime || event.startTime || null,
+              outcome.outcomeAlias || outcome.selectionName || 'N/A',
+              outcome.odds || 0,
+              market.name || market.marketName || 'N/A',
+              outcome.status || 'pending'
             ],
             (err) => {
-              if (err) {
-                console.error(`❌ [SERVER] Error inserting match:`, err);
-              }
+              if (err) console.error(`❌ [SERVER] Error inserting match:`, err);
+              processed++;
 
-              processedMatches++;
-
-              if (processedMatches === outcomes.length) {
-                console.log(`🎉 [SERVER] All matches processed!\n`);
-                res.json({
-                  success: true,
-                  message: 'Bet tracked successfully',
-                  betId,
-                  matchCount: outcomes.length
-                });
+              if (processed === outcomes.length) {
+                console.log(`🎉 [SERVER] Done! ${outcomes.length} match(es) saved\n`);
+                res.json({ success: true, message: 'Bet tracked successfully', betId, matchCount: outcomes.length });
               }
             }
           );
@@ -209,115 +182,78 @@ app.post('/track-bet', async (req, res) => {
     );
 
   } catch (error) {
-    console.error('❌ [SERVER] Error tracking bet:', error);
-    return res.json({ 
-      success: false,
-      error: error.message || 'Server error while tracking bet'
-    });
+    console.error('❌ [SERVER] Error:', error);
+    return res.json({ success: false, error: error.message || 'Server error' });
   }
 });
 
-// Route to get all bets
+// Get all bets
 app.get('/bets', (req, res) => {
   db.all('SELECT * FROM bets ORDER BY created_at DESC', [], (err, rows) => {
-    if (err) {
-      return res.json({ success: false, error: err.message, bets: [] });
-    }
+    if (err) return res.json({ success: false, error: err.message, bets: [] });
     res.json({ success: true, bets: rows });
   });
 });
 
-// Route to get a specific bet with matches
+// Get a specific bet with its matches
 app.get('/bets/:id', (req, res) => {
   const { id } = req.params;
 
   db.get('SELECT * FROM bets WHERE id = ?', [id], (err, bet) => {
-    if (err) {
-      return res.json({ success: false, error: err.message });
-    }
-    if (!bet) {
-      return res.json({ success: false, error: 'Bet not found' });
-    }
+    if (err) return res.json({ success: false, error: err.message });
+    if (!bet) return res.json({ success: false, error: 'Bet not found' });
 
     db.all('SELECT * FROM matches WHERE bet_id = ?', [id], (err, matches) => {
-      if (err) {
-        return res.json({ success: false, error: err.message });
-      }
+      if (err) return res.json({ success: false, error: err.message });
       res.json({ success: true, bet: { ...bet, matches } });
     });
   });
 });
 
-// Route to delete a bet
+// Delete a bet and its matches
 app.delete('/bets/:id', (req, res) => {
   const { id } = req.params;
 
-  // First delete associated matches
   db.run('DELETE FROM matches WHERE bet_id = ?', [id], (err) => {
-    if (err) {
-      return res.json({ success: false, error: 'Error deleting matches' });
-    }
+    if (err) return res.json({ success: false, error: 'Error deleting matches' });
 
-    // Then delete the bet
     db.run('DELETE FROM bets WHERE id = ?', [id], function(err) {
-      if (err) {
-        return res.json({ success: false, error: 'Error deleting bet' });
-      }
-      
-      if (this.changes === 0) {
-        return res.json({ success: false, error: 'Bet not found' });
-      }
-
+      if (err) return res.json({ success: false, error: 'Error deleting bet' });
+      if (this.changes === 0) return res.json({ success: false, error: 'Bet not found' });
       res.json({ success: true, message: 'Bet deleted successfully' });
     });
   });
 });
 
-// Health check route
+// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Track It API is running' });
 });
 
-// Serve static files from the React app (AFTER all API routes)
+// Serve React frontend
 const buildPath = path.join(__dirname, 'client', 'dist');
 
-// Check if build path exists
-const fs = require('fs');
 if (fs.existsSync(buildPath)) {
   console.log('✅ Found client build directory');
   app.use(express.static(buildPath));
-  
-  // The "catchall" handler: for any request that doesn't match API routes,
-  // send back the React app's index.html file.
+
   app.use((req, res) => {
     res.sendFile(path.join(buildPath, 'index.html'));
   });
 } else {
   console.warn('⚠️  Client build directory not found at:', buildPath);
-  console.warn('⚠️  Run "npm run build" to build the frontend');
-  
+
   app.use((req, res) => {
-    res.json({ 
-      error: 'Frontend not built yet. Run: npm run build',
-      buildPath: buildPath 
-    });
+    res.json({ error: 'Frontend not built. Run: npm run build', buildPath });
   });
 }
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server is running on http://localhost:${PORT}`);
-  console.log(`📊 Database: sportybet.db`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🚀 Track It running on http://localhost:${PORT}`);
+  console.log(`📊 Database: trackit.db`);
 });
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-  db.close((err) => {
-    if (err) {
-      console.error('Error closing database:', err);
-    } else {
-      console.log('Database connection closed');
-    }
-    process.exit(0);
-  });
+  db.close(() => process.exit(0));
 });
