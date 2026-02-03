@@ -32,8 +32,10 @@ const styles = {
   },
   container: {
     maxWidth: '720px',
+    width: '100%',
     margin: '0 auto',
     padding: '20px 16px',
+    boxSizing: 'border-box',
   },
 
   // Input
@@ -46,10 +48,12 @@ const styles = {
   },
   inputRow: {
     display: 'flex',
-    gap: '10px',
+    gap: '8px',
+    width: '100%',
   },
   input: {
     flex: 1,
+    minWidth: 0,
     padding: '14px 16px',
     fontSize: '15px',
     background: '#0f172a',
@@ -58,6 +62,7 @@ const styles = {
     color: '#f1f5f9',
     outline: 'none',
     transition: 'border-color 0.2s',
+    boxSizing: 'border-box',
   },
   inputFocus: {
     borderColor: '#4ade80',
@@ -107,14 +112,14 @@ const styles = {
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '12px',
+    gap: '8px',
     marginBottom: '24px',
   },
   statCard: {
     background: '#1e293b',
     border: '1px solid #334155',
     borderRadius: '12px',
-    padding: '16px 12px',
+    padding: '14px 8px',
     textAlign: 'center',
   },
   statValue: {
@@ -249,7 +254,6 @@ const styles = {
     alignItems: 'flex-end',
     justifyContent: 'center',
     zIndex: 100,
-    padding: '0',
   },
   modal: {
     background: '#1e293b',
@@ -258,9 +262,10 @@ const styles = {
     maxWidth: '720px',
     maxHeight: '85vh',
     overflowY: 'auto',
-    padding: '24px 20px',
+    padding: '24px 16px',
     border: '1px solid #334155',
     borderBottom: 'none',
+    boxSizing: 'border-box',
   },
   modalHeader: {
     display: 'flex',

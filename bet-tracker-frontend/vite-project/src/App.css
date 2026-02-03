@@ -40,3 +40,35 @@
 .read-the-docs {
   color: #888;
 }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body {
+  background: #0f172a;
+  color: #f1f5f9;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Desktop centering */
+@media (min-width: 768px) {
+  .container {
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* Mobile fixes */
+@media (max-width: 480px) {
+  input {
+    font-size: 16px !important; /* Prevents iOS zoom on input */
+  }
+}
