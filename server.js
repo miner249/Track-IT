@@ -65,6 +65,238 @@ function initializeDatabase() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════
+// 🆕 SOFASCORE API PROXY ROUTES
+// ═══════════════════════════════════════════════════════════
+
+const SOFASCORE_BASE = 'https://api.sofascore.com';
+const SOFASCORE_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'application/json',
+  'Referer': 'https://www.sofascore.com/',
+  'Origin': 'https://www.sofascore.com',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
+
+// Helper function to fetch from SofaScore
+async function fetchSofaScore(endpoint) {
+  const url = `${SOFASCORE_BASE}${endpoint}`;
+  
+  try {
+    console.log(`📡 [SOFASCORE] Fetching: ${endpoint}`);
+    
+    const response = await fetch(url, {
+      headers: SOFASCORE_HEADERS,
+      timeout: 10000,
+    });
+
+    if (!response.ok) {
+      console.error(`❌ [SOFASCORE] HTTP ${response.status}`);
+      return { error: `HTTP ${response.status}`, data: null };
+    }
+
+    const data = await response.json();
+    console.log(`✅ [SOFASCORE] Success`);
+    return { error: null, data };
+
+  } catch (error) {
+    console.error(`❌ [SOFASCORE] Error:`, error.message);
+    return { error: error.message, data: null };
+  }
+}
+
+// Route 1: Get live matches
+app.get('/api/sofascore/live-matches', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const { error, data } = await fetchSofaScore(`/sport/football/scheduled-events/${today}`);
+
+    if (error || !data || !data.events) {
+      return res.json({ 
+        success: false, 
+        error: error || 'No data',
+        matches: [] 
+      });
+    }
+
+    const LIVE_STATUSES = [1, 2, 3]; // first half, halftime, second half
+    
+    const liveMatches = data.events
+      .filter(e => LIVE_STATUSES.includes(e.status?.code))
+      .map(e => ({
+        eventId: e.id,
+        home: e.homeTeam?.name || 'Unknown',
+        away: e.awayTeam?.name || 'Unknown',
+        league: e.tournament?.name || 'Unknown',
+        status: e.statusDescription || e.status?.description || 'Live',
+        homeScore: e.homeScore?.current ?? 0,
+        awayScore: e.awayScore?.current ?? 0,
+      }));
+
+    res.json({ 
+      success: true, 
+      matches: liveMatches,
+      total: liveMatches.length 
+    });
+
+  } catch (error) {
+    console.error('❌ [API] Error in /live-matches:', error);
+    res.json({ success: false, error: error.message, matches: [] });
+  }
+});
+
+// Route 2: Get today's matches (all scheduled)
+app.get('/api/sofascore/today-matches', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const { error, data } = await fetchSofaScore(`/sport/football/scheduled-events/${today}`);
+
+    if (error || !data || !data.events) {
+      return res.json({ 
+        success: false, 
+        error: error || 'No data',
+        matches: [] 
+      });
+    }
+
+    const matches = data.events.map(e => ({
+      eventId: e.id,
+      home: e.homeTeam?.name || 'Unknown',
+      away: e.awayTeam?.name || 'Unknown',
+      league: e.tournament?.name || 'Unknown',
+      startTime: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : null,
+      status: e.statusDescription || 'Upcoming',
+      homeScore: e.homeScore?.current ?? null,
+      awayScore: e.awayScore?.current ?? null,
+    }));
+
+    res.json({ 
+      success: true, 
+      matches,
+      total: matches.length 
+    });
+
+  } catch (error) {
+    console.error('❌ [API] Error in /today-matches:', error);
+    res.json({ success: false, error: error.message, matches: [] });
+  }
+});
+
+// Route 3: Get match statistics
+app.get('/api/sofascore/match-stats/:eventId', async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { error, data } = await fetchSofaScore(`/event/${eventId}/statistics`);
+
+    if (error || !data || !data.groups) {
+      return res.json({ 
+        success: false, 
+        error: error || 'No stats data',
+        stats: null 
+      });
+    }
+
+    const stats = {};
+    data.groups.forEach(group => {
+      if (group.statisticItems) {
+        group.statisticItems.forEach(item => {
+          stats[item.key] = {
+            home: item.homeValue,
+            away: item.awayValue,
+          };
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      stats: {
+        corners: {
+          home: parseInt(stats['corners']?.home) || 0,
+          away: parseInt(stats['corners']?.away) || 0,
+          total: (parseInt(stats['corners']?.home) || 0) + (parseInt(stats['corners']?.away) || 0),
+        },
+        goals: {
+          home: parseInt(stats['goals']?.home) || 0,
+          away: parseInt(stats['goals']?.away) || 0,
+        },
+        yellowCards: {
+          home: parseInt(stats['yellowCards']?.home) || 0,
+          away: parseInt(stats['yellowCards']?.away) || 0,
+        },
+        shotsOnTarget: {
+          home: parseInt(stats['shotsOnTarget']?.home) || 0,
+          away: parseInt(stats['shotsOnTarget']?.away) || 0,
+        },
+      },
+    });
+
+  } catch (error) {
+    console.error('❌ [API] Error in /match-stats:', error);
+    res.json({ success: false, error: error.message, stats: null });
+  }
+});
+
+// Route 4: Match user's bet teams to SofaScore events
+app.post('/api/sofascore/find-match', async (req, res) => {
+  try {
+    const { homeTeam, awayTeam } = req.body;
+    
+    if (!homeTeam || !awayTeam) {
+      return res.json({ success: false, error: 'Missing team names', match: null });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const { error, data } = await fetchSofaScore(`/sport/football/scheduled-events/${today}`);
+
+    if (error || !data || !data.events) {
+      return res.json({ success: false, error: error || 'No data', match: null });
+    }
+
+    // Fuzzy match team names
+    const normalize = (name) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const bHome = normalize(homeTeam);
+    const bAway = normalize(awayTeam);
+
+    const match = data.events.find(e => {
+      const mHome = normalize(e.homeTeam?.name || '');
+      const mAway = normalize(e.awayTeam?.name || '');
+      
+      return (
+        (mHome === bHome && mAway === bAway) ||
+        ((mHome.includes(bHome) || bHome.includes(mHome)) &&
+         (mAway.includes(bAway) || bAway.includes(mAway)))
+      );
+    });
+
+    if (match) {
+      res.json({
+        success: true,
+        match: {
+          eventId: match.id,
+          home: match.homeTeam?.name,
+          away: match.awayTeam?.name,
+          league: match.tournament?.name,
+          startTime: match.startTimestamp ? new Date(match.startTimestamp * 1000).toISOString() : null,
+          homeScore: match.homeScore?.current ?? null,
+          awayScore: match.awayScore?.current ?? null,
+          status: match.statusDescription,
+        },
+      });
+    } else {
+      res.json({ success: false, match: null, error: 'Match not found' });
+    }
+
+  } catch (error) {
+    console.error('❌ [API] Error in /find-match:', error);
+    res.json({ success: false, error: error.message, match: null });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// EXISTING BET TRACKING ROUTES
+// ═══════════════════════════════════════════════════════════
+
 // Track bet endpoint
 app.post('/track-bet', async (req, res) => {
   const { shareCode } = req.body;
@@ -106,26 +338,19 @@ app.post('/track-bet', async (req, res) => {
       return res.json({ success: false, error: 'No bet data found' });
     }
 
-    // Log the TOP-LEVEL keys to find where stake/totalOdds/win might be
     console.log(`📦 [SERVER] Top-level keys:`, Object.keys(betData));
     console.log(`📦 [SERVER] ticket keys:`, Object.keys(betData.ticket || {}));
 
     const ticket = betData.ticket || {};
     const outcomes = betData.outcomes || [];
 
-    // --- EXTRACT ODDS FROM EACH OUTCOME ---
-    // Each outcome has: markets[0].outcomes[0].odds  (the selected outcome's odds)
-    // ticket.selections tells us which outcomeId was picked per match
-    // We multiply all odds together to get totalOdds
     let totalOdds = 1;
     const parsedMatches = [];
 
     outcomes.forEach((outcome, index) => {
-      // Find the selected outcomeId from ticket.selections
       const selection = ticket.selections ? ticket.selections[index] : null;
       const selectedOutcomeId = selection ? selection.outcomeId : null;
 
-      // Find the matching market and outcome odds
       let matchOdds = 0;
       let marketName = 'N/A';
       let selectionName = 'N/A';
@@ -135,7 +360,6 @@ app.post('/track-bet', async (req, res) => {
         marketName = market.desc || market.name || 'N/A';
 
         if (market.outcomes && market.outcomes.length > 0) {
-          // Find the outcome that matches the selected outcomeId
           const selectedOutcome = market.outcomes.find(o => o.id === selectedOutcomeId) || market.outcomes[0];
           matchOdds = parseFloat(selectedOutcome.odds) || 0;
           selectionName = selectedOutcome.desc || selectedOutcome.name || 'N/A';
@@ -144,7 +368,6 @@ app.post('/track-bet', async (req, res) => {
 
       totalOdds *= matchOdds;
 
-      // League: sport.category.tournament.name
       const league = outcome.sport?.category?.tournament?.name || 'Unknown';
 
       parsedMatches.push({
@@ -160,18 +383,13 @@ app.post('/track-bet', async (req, res) => {
       });
     });
 
-    // Round totalOdds to 2 decimal places
     totalOdds = Math.round(totalOdds * 100) / 100;
 
-    // Stake and potential win — check if they exist anywhere in the response
-    // If not, we set stake to 0 and calculate potential win from totalOdds
     const stake = betData.stake || ticket.stake || betData.stakeAmount || 0;
     const potentialWin = betData.maxWinAmount || ticket.maxWinAmount || (stake * totalOdds) || 0;
 
     console.log(`💰 [SERVER] Total Odds: ${totalOdds} | Stake: ${stake} | Potential Win: ${potentialWin}`);
-    console.log(`⚽ [SERVER] Matches:`, JSON.stringify(parsedMatches, null, 2));
 
-    // --- SAVE BET ---
     db.run(
       `INSERT OR REPLACE INTO bets (share_code, total_odds, stake, potential_win, currency, raw_data)
        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -189,7 +407,6 @@ app.post('/track-bet', async (req, res) => {
           return res.json({ success: true, message: 'Bet tracked (no matches)', betId });
         }
 
-        // --- SAVE MATCHES ---
         let processed = 0;
 
         parsedMatches.forEach((match) => {
@@ -292,6 +509,7 @@ if (fs.existsSync(buildPath)) {
 app.listen(PORT, () => {
   console.log(`🚀 Track It running on http://localhost:${PORT}`);
   console.log(`📊 Database: trackit.db`);
+  console.log(`🔴 SofaScore API proxy enabled`);
 });
 
 // Graceful shutdown

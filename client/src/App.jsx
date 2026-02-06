@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import LiveMatchTracker from './LiveMatchTracker';
 
 const API_URL = window.location.origin;
 
@@ -55,7 +56,7 @@ const styles = {
     flex: 1,
     minWidth: 0,
     padding: '14px 16px',
-    fontSize: '16px', // 16px prevents iOS zoom — set here directly
+    fontSize: '16px',
     background: '#0f172a',
     border: '2px solid #334155',
     borderRadius: '10px',
@@ -78,7 +79,7 @@ const styles = {
     cursor: 'pointer',
     whiteSpace: 'nowrap',
     transition: 'opacity 0.2s, transform 0.1s',
-    flexShrink: 0, // prevents the button from shrinking on narrow screens
+    flexShrink: 0,
   },
   trackBtnDisabled: {
     opacity: 0.5,
@@ -112,7 +113,6 @@ const styles = {
   // Stats
   statsGrid: {
     display: 'grid',
-    // single column on very small screens via JS — see inline override below
     gridTemplateColumns: 'repeat(3, 1fr)',
     gap: '8px',
     marginBottom: '24px',
@@ -176,7 +176,7 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: '10px',
-    gap: '8px', // gap so badge doesn't overlap long codes
+    gap: '8px',
   },
   betCode: {
     fontSize: '16px',
@@ -184,7 +184,7 @@ const styles = {
     color: '#f1f5f9',
     letterSpacing: '0.5px',
     minWidth: 0,
-    wordBreak: 'break-all', // long share codes wrap cleanly
+    wordBreak: 'break-all',
   },
   statusBadge: {
     fontSize: '11px',
@@ -193,7 +193,7 @@ const styles = {
     borderRadius: '20px',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
-    flexShrink: 0, // badge never shrinks
+    flexShrink: 0,
   },
   statusPending: {
     background: '#1e3a5f',
@@ -208,7 +208,7 @@ const styles = {
   betInfoItem: {
     display: 'flex',
     flexDirection: 'column',
-    minWidth: '70px', // ensures items don't collapse to nothing
+    minWidth: '70px',
   },
   betInfoLabel: {
     fontSize: '10px',
@@ -287,7 +287,7 @@ const styles = {
     margin: 0,
     color: '#f1f5f9',
     minWidth: 0,
-    wordBreak: 'break-all', // long codes in the modal title wrap
+    wordBreak: 'break-all',
   },
   modalClose: {
     background: '#334155',
@@ -297,7 +297,7 @@ const styles = {
     borderRadius: '8px',
     width: '32px',
     height: '32px',
-    minWidth: '32px', // never shrinks
+    minWidth: '32px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -331,7 +331,7 @@ const styles = {
     alignItems: 'center',
     marginBottom: '10px',
     gap: '8px',
-    flexWrap: 'wrap', // teams + odds badge wrap on tiny screens
+    flexWrap: 'wrap',
   },
   matchTeams: {
     fontSize: '15px',
@@ -510,6 +510,9 @@ function App() {
       </div>
 
       <div style={styles.container}>
+        {/* Live Match Tracker */}
+        <LiveMatchTracker bets={bets} />
+
         {/* Input */}
         <div style={styles.inputCard}>
           <form onSubmit={handleSubmit}>
