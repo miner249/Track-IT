@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import LiveMatchTracker from './LiveMatchTracker';
+import MyLiveBets from './MyLiveBets';
 
 const API_URL = window.location.origin;
 
@@ -27,9 +28,31 @@ const styles = {
     letterSpacing: '-0.5px',
   },
   headerSub: {
-    margin: '6px 0 0',
+    margin: '6px 0 16px',
     color: '#64748b',
     fontSize: '14px',
+  },
+  nav: {
+    display: 'flex',
+    gap: '8px',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  navBtn: {
+    padding: '10px 20px',
+    fontSize: '14px',
+    fontWeight: '600',
+    background: 'transparent',
+    color: '#94a3b8',
+    border: '1px solid #334155',
+    borderRadius: '10px',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+  navBtnActive: {
+    background: 'linear-gradient(135deg, #4ade80, #22c55e)',
+    color: '#0f172a',
+    border: '1px solid #4ade80',
   },
   container: {
     maxWidth: '720px',
@@ -38,8 +61,6 @@ const styles = {
     padding: '20px 16px',
     boxSizing: 'border-box',
   },
-
-  // Input
   inputCard: {
     background: '#1e293b',
     borderRadius: '16px',
@@ -85,8 +106,6 @@ const styles = {
     opacity: 0.5,
     cursor: 'not-allowed',
   },
-
-  // Message
   message: {
     padding: '12px 16px',
     borderRadius: '10px',
@@ -109,8 +128,6 @@ const styles = {
     color: '#bae6fd',
     border: '1px solid #1d4ed8',
   },
-
-  // Stats
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
@@ -135,8 +152,6 @@ const styles = {
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
   },
-
-  // Section
   sectionHeader: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -157,8 +172,6 @@ const styles = {
     padding: '4px 10px',
     borderRadius: '20px',
   },
-
-  // Bet Card
   betCard: {
     background: '#1e293b',
     border: '1px solid #334155',
@@ -251,8 +264,6 @@ const styles = {
     color: '#475569',
     marginTop: '8px',
   },
-
-  // Detail Modal
   modalOverlay: {
     position: 'fixed',
     top: 0, left: 0, right: 0, bottom: 0,
@@ -316,8 +327,6 @@ const styles = {
     textAlign: 'center',
     border: '1px solid #334155',
   },
-
-  // Match Card in Detail
   matchCard: {
     background: '#0f172a',
     border: '1px solid #334155',
@@ -365,8 +374,6 @@ const styles = {
     color: '#94a3b8',
     fontWeight: '600',
   },
-
-  // Empty State
   emptyState: {
     textAlign: 'center',
     padding: '60px 20px',
@@ -392,20 +399,12 @@ function App() {
   const [selectedBet, setSelectedBet] = useState(null);
   const [hoveredBet, setHoveredBet] = useState(null);
   const [inputFocused, setInputFocused] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 480);
-
-  // Listen for resize to toggle mobile layout
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 480);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
+  const [currentPage, setCurrentPage] = useState('home');
 
   useEffect(() => {
     fetchBets();
   }, []);
 
-  // Auto-dismiss message
   useEffect(() => {
     if (message.text) {
       const timer = setTimeout(() => setMessage({ text: '', type: '' }), 4000);
@@ -489,146 +488,153 @@ function App() {
     return { ...styles.message, ...styles.messageLoading };
   };
 
-  // Responsive grid columns: 1 col on mobile, 3 on desktop
-  const statsGridStyle = {
-    ...styles.statsGrid,
-    gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-  };
-
-  const modalStatsStyle = {
-    ...styles.modalStatsRow,
-    gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-  };
-
-  // ── RENDER ──
   return (
     <div style={styles.app}>
-      {/* Header */}
       <div style={styles.header}>
         <h1 style={styles.headerTitle}>⚡ TrackIt</h1>
         <p style={styles.headerSub}>Real-time bet tracking</p>
+        
+        <div style={styles.nav}>
+          <button 
+            style={currentPage === 'home' ? {...styles.navBtn, ...styles.navBtnActive} : styles.navBtn}
+            onClick={() => setCurrentPage('home')}
+          >
+            🏠 My Bets
+          </button>
+          <button 
+            style={currentPage === 'my-live-bets' ? {...styles.navBtn, ...styles.navBtnActive} : styles.navBtn}
+            onClick={() => setCurrentPage('my-live-bets')}
+          >
+            🎯 Live Bets
+          </button>
+          <button 
+            style={currentPage === 'live' ? {...styles.navBtn, ...styles.navBtnActive} : styles.navBtn}
+            onClick={() => setCurrentPage('live')}
+          >
+            🔴 All Live
+          </button>
+        </div>
       </div>
 
       <div style={styles.container}>
-        {/* Live Match Tracker */}
-        <LiveMatchTracker bets={bets} />
-
-        {/* Input */}
-        <div style={styles.inputCard}>
-          <form onSubmit={handleSubmit}>
-            <div style={styles.inputRow}>
-              <input
-                type="text"
-                placeholder="Enter SportyBet share code..."
-                value={shareCode}
-                onChange={(e) => setShareCode(e.target.value)}
-                onFocus={() => setInputFocused(true)}
-                onBlur={() => setInputFocused(false)}
-                disabled={loading}
-                style={{
-                  ...styles.input,
-                  ...(inputFocused ? styles.inputFocus : {}),
-                  ...(loading ? { opacity: 0.5 } : {}),
-                }}
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  ...styles.trackBtn,
-                  ...(loading ? styles.trackBtnDisabled : {}),
-                }}
-              >
-                {loading ? '🔄 ...' : '+ Track'}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Message */}
-        {message.text && <div style={getMsgStyle()}>{message.text}</div>}
-
-        {/* Stats */}
-        <div style={statsGridStyle}>
-          <div style={styles.statCard}>
-            <div style={{ ...styles.statValue, color: '#38bdf8' }}>{bets.length}</div>
-            <div style={styles.statLabel}>Total Bets</div>
-          </div>
-          <div style={styles.statCard}>
-            <div style={{ ...styles.statValue, color: '#4ade80' }}>
-              {bets.reduce((sum, b) => sum + (parseFloat(b.stake) || 0), 0) > 0
-                ? fmt(bets.reduce((sum, b) => sum + (parseFloat(b.stake) || 0), 0))
-                : '₦0.00'}
-            </div>
-            <div style={styles.statLabel}>Total Staked</div>
-          </div>
-          <div style={styles.statCard}>
-            <div style={{ ...styles.statValue, color: '#fb923c' }}>
-              {bets.reduce((sum, b) => sum + (parseFloat(b.potential_win) || 0), 0) > 0
-                ? fmt(bets.reduce((sum, b) => sum + (parseFloat(b.potential_win) || 0), 0))
-                : '₦0.00'}
-            </div>
-            <div style={styles.statLabel}>Potential Win</div>
-          </div>
-        </div>
-
-        {/* Bets List */}
-        <div style={styles.sectionHeader}>
-          <h2 style={styles.sectionTitle}>📋 My Bets</h2>
-          <span style={styles.betCount}>{bets.length} tracked</span>
-        </div>
-
-        {bets.length === 0 ? (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>🎯</div>
-            <p style={styles.emptyText}>No bets tracked yet.<br />Enter a share code above to get started!</p>
-          </div>
-        ) : (
-          bets.map((bet) => (
-            <div
-              key={bet.id}
-              style={{
-                ...styles.betCard,
-                ...(hoveredBet === bet.id ? styles.betCardHover : {}),
-              }}
-              onMouseEnter={() => setHoveredBet(bet.id)}
-              onMouseLeave={() => setHoveredBet(null)}
-              onClick={(e) => handleViewBet(bet.id, e)}
-            >
-              <div style={styles.betCardTop}>
-                <span style={styles.betCode}>{bet.share_code}</span>
-                <span style={{ ...styles.statusBadge, ...styles.statusPending }}>Pending</span>
-              </div>
-
-              <div style={styles.betInfo}>
-                <div style={styles.betInfoItem}>
-                  <span style={styles.betInfoLabel}>Odds</span>
-                  <span style={{ ...styles.betInfoValue, color: '#4ade80' }}>{bet.total_odds}x</span>
+        {currentPage === 'home' && (
+          <>
+            <div style={styles.inputCard}>
+              <form onSubmit={handleSubmit}>
+                <div style={styles.inputRow}>
+                  <input 
+                    type="text"
+                    placeholder="Enter SportyBet share code..."
+                    value={shareCode}
+                    onChange={(e) => setShareCode(e.target.value)}
+                    onFocus={() => setInputFocused(true)}
+                    onBlur={() => setInputFocused(false)}
+                    disabled={loading}
+                    style={{
+                      ...styles.input,
+                      ...(inputFocused ? styles.inputFocus : {}),
+                      ...(loading ? { opacity: 0.5 } : {}),
+                    }}
+                  />
+                  <button 
+                    type="submit"
+                    disabled={loading}
+                    style={{
+                      ...styles.trackBtn,
+                      ...(loading ? styles.trackBtnDisabled : {}),
+                    }}
+                  >
+                    {loading ? '🔄 ...' : '+ Track'}
+                  </button>
                 </div>
-                <div style={styles.betInfoItem}>
-                  <span style={styles.betInfoLabel}>Stake</span>
-                  <span style={{ ...styles.betInfoValue, color: '#f1f5f9' }}>{fmt(bet.stake)}</span>
-                </div>
-                <div style={styles.betInfoItem}>
-                  <span style={styles.betInfoLabel}>Potential Win</span>
-                  <span style={{ ...styles.betInfoValue, color: '#fb923c' }}>{fmt(bet.potential_win)}</span>
-                </div>
-              </div>
+              </form>
+            </div>
 
-              <div style={styles.betActions}>
-                <button style={styles.btnView} onClick={(e) => handleViewBet(bet.id, e)}>View</button>
-                <button style={styles.btnDelete} onClick={(e) => handleDelete(bet.id, e)}>Delete</button>
-              </div>
+            {message.text && <div style={getMsgStyle()}>{message.text}</div>}
 
-              <div style={styles.betTime}>
-                🕐 {new Date(bet.created_at).toLocaleString()}
+            <div style={styles.statsGrid}>
+              <div style={styles.statCard}>
+                <div style={{ ...styles.statValue, color: '#38bdf8' }}>{bets.length}</div>
+                <div style={styles.statLabel}>Total Bets</div>
+              </div>
+              <div style={styles.statCard}>
+                <div style={{ ...styles.statValue, color: '#4ade80' }}>
+                  {bets.reduce((sum, b) => sum + (parseFloat(b.stake) || 0), 0) > 0
+                    ? fmt(bets.reduce((sum, b) => sum + (parseFloat(b.stake) || 0), 0))
+                    : '₦0.00'}
+                </div>
+                <div style={styles.statLabel}>Total Staked</div>
+              </div>
+              <div style={styles.statCard}>
+                <div style={{ ...styles.statValue, color: '#fb923c' }}>
+                  {bets.reduce((sum, b) => sum + (parseFloat(b.potential_win) || 0), 0) > 0
+                    ? fmt(bets.reduce((sum, b) => sum + (parseFloat(b.potential_win) || 0), 0))
+                    : '₦0.00'}
+                </div>
+                <div style={styles.statLabel}>Potential Win</div>
               </div>
             </div>
-          ))
+
+            <div style={styles.sectionHeader}>
+              <h2 style={styles.sectionTitle}>📋 My Bets</h2>
+              <span style={styles.betCount}>{bets.length} tracked</span>
+            </div>
+
+            {bets.length === 0 ? (
+              <div style={styles.emptyState}>
+                <div style={styles.emptyIcon}>🎯</div>
+                <p style={styles.emptyText}>No bets tracked yet.<br />Enter a share code above to get started!</p>
+              </div>
+            ) : (
+              bets.map((bet) => (
+                <div 
+                  key={bet.id}
+                  style={{
+                    ...styles.betCard,
+                    ...(hoveredBet === bet.id ? styles.betCardHover : {}),
+                  }}
+                  onMouseEnter={() => setHoveredBet(bet.id)}
+                  onMouseLeave={() => setHoveredBet(null)}
+                  onClick={(e) => handleViewBet(bet.id, e)}
+                >
+                  <div style={styles.betCardTop}>
+                    <span style={styles.betCode}>{bet.share_code}</span>
+                    <span style={{ ...styles.statusBadge, ...styles.statusPending }}>Pending</span>
+                  </div>
+
+                  <div style={styles.betInfo}>
+                    <div style={styles.betInfoItem}>
+                      <span style={styles.betInfoLabel}>Odds</span>
+                      <span style={{ ...styles.betInfoValue, color: '#4ade80' }}>{bet.total_odds}x</span>
+                    </div>
+                    <div style={styles.betInfoItem}>
+                      <span style={styles.betInfoLabel}>Stake</span>
+                      <span style={{ ...styles.betInfoValue, color: '#f1f5f9' }}>{fmt(bet.stake)}</span>
+                    </div>
+                    <div style={styles.betInfoItem}>
+                      <span style={styles.betInfoLabel}>Potential Win</span>
+                      <span style={{ ...styles.betInfoValue, color: '#fb923c' }}>{fmt(bet.potential_win)}</span>
+                    </div>
+                  </div>
+
+                  <div style={styles.betActions}>
+                    <button style={styles.btnView} onClick={(e) => handleViewBet(bet.id, e)}>View</button>
+                    <button style={styles.btnDelete} onClick={(e) => handleDelete(bet.id, e)}>Delete</button>
+                  </div>
+
+                  <div style={styles.betTime}>
+                    🕐 {new Date(bet.created_at).toLocaleString()}
+                  </div>
+                </div>
+              ))
+            )}
+          </>
         )}
+
+        {currentPage === 'my-live-bets' && <MyLiveBets />}
+        {currentPage === 'live' && <LiveMatchTracker bets={bets} />}
       </div>
 
-      {/* Detail Modal */}
       {selectedBet && (
         <div style={styles.modalOverlay} onClick={() => setSelectedBet(null)}>
           <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
@@ -637,8 +643,7 @@ function App() {
               <button style={styles.modalClose} onClick={() => setSelectedBet(null)}>✕</button>
             </div>
 
-            {/* Modal Stats */}
-            <div style={modalStatsStyle}>
+            <div style={styles.modalStatsRow}>
               <div style={styles.modalStatCard}>
                 <div style={{ ...styles.statValue, color: '#4ade80', fontSize: '20px' }}>{selectedBet.total_odds}x</div>
                 <div style={styles.statLabel}>Total Odds</div>
@@ -653,7 +658,6 @@ function App() {
               </div>
             </div>
 
-            {/* Matches */}
             <div style={{ marginBottom: '16px' }}>
               <h3 style={{ ...styles.sectionTitle, marginBottom: '12px' }}>
                 ⚽ Matches ({selectedBet.matches?.length || 0})
@@ -677,9 +681,8 @@ function App() {
                 <p style={{ textAlign: 'center', color: '#475569', padding: '20px' }}>No matches found</p>
               )}
             </div>
-
-            {/* Modal Delete */}
-            <button
+             
+            <button 
               onClick={(e) => handleDelete(selectedBet.id, e)}
               style={{
                 ...styles.btnDelete,
