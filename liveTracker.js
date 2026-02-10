@@ -24,6 +24,9 @@ const cache = {
   matchStats: new Map(), // eventId -> { data, timestamp }
 };
 
+// Track pending Apify runs
+const pendingRuns = new Map(); // runId -> { type, startedAt, status }
+
 // ═══════════════════════════════════════════════════════════
 // FOOTBALL-DATA.ORG (PRIMARY SOURCE)
 // ═══════════════════════════════════════════════════════════
@@ -65,56 +68,140 @@ async function fetchFootballData(endpoint) {
 // APIFY/FLASHSCORE (FALLBACK SOURCE)
 // ═══════════════════════════════════════════════════════════
 
-async function scrapeFlashscoreLive() {
+/**
+ * Scrape live matches from Flashscore using Apify
+ * @param {boolean} async - If true, starts run and returns immediately
+ */
+async function scrapeFlashscoreLive(async = false) {
   if (!apifyClient) {
     console.error('❌ [Apify] API key not configured');
     return { error: 'APIFY_NOT_CONFIGURED', matches: [] };
   }
 
   try {
-    console.log(`📡 [Apify] Running Flashscore scraper...`);
+    console.log(`📡 [Apify] ${async ? 'Starting' : 'Running'} Flashscore scraper...`);
 
-    // Use a generic web scraper or Flashscore-specific actor
-    // Note: You might need to find a specific Flashscore scraper on Apify store
-    // For now, this is a placeholder structure
-    const run = await apifyClient.actor('apify/web-scraper').call({
-      startUrls: [{ url: 'https://www.flashscore.com/' }],
-      pageFunction: async ({ page }) => {
-        // Extract live match data from page
-        return await page.evaluate(() => {
-          // This is pseudocode - you'd need to inspect Flashscore's HTML
-          const matches = [];
-          document.querySelectorAll('.event').forEach(el => {
-            // Extract match data from DOM
-          });
-          return matches;
+    if (async) {
+      // Non-blocking: start and return immediately
+      const run = await apifyClient
+        .actor('statanow/flashscore-scraper-live')
+        .start({
+          // This actor scrapes live matches automatically
+          // Check https://apify.com/statanow/flashscore-scraper-live for input options
         });
-      },
-      maxRequestsPerCrawl: 1,
-    });
 
-    const { items } = await apifyClient.dataset(run.defaultDatasetId).listItems();
-    
-    console.log(`✅ [Apify] Got ${items.length} matches`);
+      pendingRuns.set(run.id, {
+        type: 'live_matches',
+        startedAt: Date.now(),
+        status: 'RUNNING',
+      });
 
-    const matches = items.map(item => ({
-      eventId: item.id || `flash_${Date.now()}_${Math.random()}`,
-      home: item.homeTeam || 'Unknown',
-      away: item.awayTeam || 'Unknown',
-      league: item.league || 'Unknown',
-      status: 'Live',
-      homeScore: parseInt(item.homeScore) || 0,
-      awayScore: parseInt(item.awayScore) || 0,
-      source: 'flashscore',
-    }));
+      console.log(`✅ [Apify] Started run ${run.id}`);
+      return { runId: run.id, status: 'RUNNING' };
 
-    return { error: null, matches };
+    } else {
+      // Blocking: wait for results
+      const run = await apifyClient
+        .actor('statanow/flashscore-scraper-live')
+        .call({
+          // Add any required input parameters here
+          // Most Flashscore scrapers work without input
+        });
+
+      const { items } = await apifyClient.dataset(run.defaultDatasetId).listItems();
+      
+      console.log(`✅ [Apify] Got ${items.length} matches`);
+
+      // Map Flashscore data to our format
+      const matches = items.map(item => ({
+        eventId: item.eventId || item.id || `flash_${Date.now()}_${Math.random()}`,
+        home: item.homeTeam?.name || item.homeTeam || 'Unknown',
+        away: item.awayTeam?.name || item.awayTeam || 'Unknown',
+        league: item.tournament?.name || item.league || item.category || 'Unknown',
+        status: item.status || (item.isLive ? 'Live' : 'Scheduled'),
+        homeScore: parseInt(item.homeScore?.current || item.homeScore) || 0,
+        awayScore: parseInt(item.awayScore?.current || item.awayScore) || 0,
+        time: item.time || item.startTime || null,
+        source: 'flashscore',
+      }));
+
+      return { error: null, matches };
+    }
 
   } catch (error) {
     console.error(`❌ [Apify] Error:`, error.message);
     return { error: error.message, matches: [] };
   }
 }
+
+/**
+ * Check status of pending Apify run
+ */
+async function checkApifyRunStatus(runId) {
+  try {
+    const run = await apifyClient.run(runId).get();
+    
+    if (run.status === 'SUCCEEDED') {
+      const { items } = await apifyClient.dataset(run.defaultDatasetId).listItems();
+      
+      const matches = items.map(item => ({
+        eventId: item.eventId || item.id || `flash_${Date.now()}_${Math.random()}`,
+        home: item.homeTeam?.name || item.homeTeam || 'Unknown',
+        away: item.awayTeam?.name || item.awayTeam || 'Unknown',
+        league: item.tournament?.name || item.league || item.category || 'Unknown',
+        status: item.status || (item.isLive ? 'Live' : 'Scheduled'),
+        homeScore: parseInt(item.homeScore?.current || item.homeScore) || 0,
+        awayScore: parseInt(item.awayScore?.current || item.awayScore) || 0,
+        time: item.time || item.startTime || null,
+        source: 'flashscore',
+      }));
+      
+      return { status: 'SUCCEEDED', matches };
+    }
+    
+    if (run.status === 'FAILED' || run.status === 'ABORTED') {
+      return { status: run.status, error: run.statusMessage };
+    }
+    
+    return { status: 'RUNNING' };
+    
+  } catch (error) {
+    return { status: 'ERROR', error: error.message };
+  }
+}
+
+// Background polling for pending runs (optional)
+setInterval(async () => {
+  for (const [runId, job] of pendingRuns) {
+    // Skip if job is too recent (give it time)
+    if (Date.now() - job.startedAt < 10000) continue;
+    
+    // Timeout after 5 minutes
+    if (Date.now() - job.startedAt > 300000) {
+      console.warn(`⏰ [Apify] Run ${runId} timed out`);
+      pendingRuns.delete(runId);
+      continue;
+    }
+    
+    const result = await checkApifyRunStatus(runId);
+    
+    if (result.status === 'SUCCEEDED') {
+      // Update cache
+      cache.liveMatches = {
+        data: result.matches,
+        timestamp: Date.now(),
+        source: 'flashscore',
+      };
+      
+      pendingRuns.delete(runId);
+      console.log(`✅ [Poll] Run ${runId} completed with ${result.matches.length} matches`);
+      
+    } else if (result.status === 'FAILED' || result.status === 'ABORTED') {
+      pendingRuns.delete(runId);
+      console.error(`❌ [Poll] Run ${runId} failed`);
+    }
+  }
+}, 15000); // Check every 15 seconds
 
 // ═══════════════════════════════════════════════════════════
 // HYBRID LOGIC - AUTO FALLBACK
@@ -155,11 +242,11 @@ async function getLiveMatches() {
     return { matches, source: 'football-data' };
   }
 
-  // TRY 2: Apify/Flashscore (fallback)
+  // TRY 2: Apify/Flashscore (fallback) - BLOCKING VERSION
   console.log('⚠️  [Hybrid] Football-Data failed, trying Flashscore...');
-  const { error: apifyError, matches: apifyMatches } = await scrapeFlashscoreLive();
+  const { error: apifyError, matches: apifyMatches } = await scrapeFlashscoreLive(false);
 
-  if (!apifyError && apifyMatches.length > 0) {
+  if (!apifyError && apifyMatches && apifyMatches.length > 0) {
     console.log(`✅ [Hybrid] Flashscore returned ${apifyMatches.length} matches`);
     
     // Cache it
@@ -224,7 +311,28 @@ async function findMatch(homeTeam, awayTeam) {
     }
   }
 
-  // TRY 2: Would use Apify here, but requires custom implementation
+  // TRY 2: Check Flashscore
+  console.log('⚠️  [Hybrid] Not found in Football-Data, checking Flashscore...');
+  const { error: apifyError, matches: apifyMatches } = await scrapeFlashscoreLive(false);
+
+  if (!apifyError && apifyMatches) {
+    const match = apifyMatches.find(m => {
+      const mHome = normalize(m.home);
+      const mAway = normalize(m.away);
+      
+      return (
+        (mHome === targetHome && mAway === targetAway) ||
+        (mHome.includes(targetHome) && mAway.includes(targetAway)) ||
+        (targetHome.includes(mHome) && targetAway.includes(mAway))
+      );
+    });
+
+    if (match) {
+      console.log(`✅ [Hybrid] Found on Flashscore`);
+      return match;
+    }
+  }
+
   console.warn(`❌ [Hybrid] Match not found`);
   return null;
 }
@@ -284,4 +392,6 @@ module.exports = {
   getLiveMatches,
   findMatch,
   getMatchStats,
+  checkApifyRunStatus, // Export for manual status checks
+  scrapeFlashscoreLive, // Export for direct access
 };
