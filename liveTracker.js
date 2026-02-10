@@ -85,10 +85,7 @@ async function scrapeFlashscoreLive(async = false) {
       // Non-blocking: start and return immediately
       const run = await apifyClient
         .actor('statanow/flashscore-scraper-live')
-        .start({
-          // This actor scrapes live matches automatically
-          // Check https://apify.com/statanow/flashscore-scraper-live for input options
-        });
+        .start({});
 
       pendingRuns.set(run.id, {
         type: 'live_matches',
@@ -103,28 +100,27 @@ async function scrapeFlashscoreLive(async = false) {
       // Blocking: wait for results
       const run = await apifyClient
         .actor('statanow/flashscore-scraper-live')
-        .call({
-          // Add any required input parameters here
-          // Most Flashscore scrapers work without input
-        });
+        .call({});
 
       const { items } = await apifyClient.dataset(run.defaultDatasetId).listItems();
       
       console.log(`✅ [Apify] Got ${items.length} matches`);
 
-      // Map Flashscore data to our format
+      // ✅ FIXED: Map using underscore field names
       const matches = items.map(item => ({
         eventId: item.eventId || item.id || `flash_${Date.now()}_${Math.random()}`,
-        home: item.homeTeam?.name || item.homeTeam || 'Unknown',
-        away: item.awayTeam?.name || item.awayTeam || 'Unknown',
-        league: item.tournament?.name || item.league || item.category || 'Unknown',
-        status: item.status || (item.isLive ? 'Live' : 'Scheduled'),
-        homeScore: parseInt(item.homeScore?.current || item.homeScore) || 0,
-        awayScore: parseInt(item.awayScore?.current || item.awayScore) || 0,
-        time: item.time || item.startTime || null,
+        home: item.home_team || 'Unknown',                    
+        away: item.away_team || 'Unknown',                    
+        league: item.league || 'Unknown',                     
+        status: item.status || 'Live',                        
+        homeScore: parseInt(item.home_score) || 0,           
+        awayScore: parseInt(item.away_score) || 0,           
+        time: item.status_time || item.start_time || null,   
         source: 'flashscore',
       }));
 
+      console.log(`✅ [Apify] Mapped ${matches.length} matches`);
+      
       return { error: null, matches };
     }
 
@@ -144,15 +140,16 @@ async function checkApifyRunStatus(runId) {
     if (run.status === 'SUCCEEDED') {
       const { items } = await apifyClient.dataset(run.defaultDatasetId).listItems();
       
+      // ✅ FIXED: Use underscore field names
       const matches = items.map(item => ({
         eventId: item.eventId || item.id || `flash_${Date.now()}_${Math.random()}`,
-        home: item.homeTeam?.name || item.homeTeam || 'Unknown',
-        away: item.awayTeam?.name || item.awayTeam || 'Unknown',
-        league: item.tournament?.name || item.league || item.category || 'Unknown',
-        status: item.status || (item.isLive ? 'Live' : 'Scheduled'),
-        homeScore: parseInt(item.homeScore?.current || item.homeScore) || 0,
-        awayScore: parseInt(item.awayScore?.current || item.awayScore) || 0,
-        time: item.time || item.startTime || null,
+        home: item.home_team || 'Unknown',                    
+        away: item.away_team || 'Unknown',                    
+        league: item.league || 'Unknown',                     
+        status: item.status || 'Live',                        
+        homeScore: parseInt(item.home_score) || 0,           
+        awayScore: parseInt(item.away_score) || 0,           
+        time: item.status_time || item.start_time || null,   
         source: 'flashscore',
       }));
       
@@ -201,7 +198,7 @@ setInterval(async () => {
       console.error(`❌ [Poll] Run ${runId} failed`);
     }
   }
-}, 15000); // Check every 15 seconds
+}, 30000); // Check every 30 seconds
 
 // ═══════════════════════════════════════════════════════════
 // HYBRID LOGIC - AUTO FALLBACK
