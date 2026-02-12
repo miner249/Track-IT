@@ -2,7 +2,7 @@
 
 > A modern SportyBet betting tracker with real-time match updates
 
-
+![alt text](<Screenshot Capture - 2026-02-12 - 06-42-09.png>) ![alt text](<Screenshot Capture - 2026-02-12 - 06-42-45.png>)
 
 ---
 
