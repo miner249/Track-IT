@@ -1,3 +1,8 @@
+/* ═══════════════════════════════════════════════════════
+   TRACK IT - GLOBAL RESET
+   Minimal reset, design system imported separately
+   ═══════════════════════════════════════════════════════ */
+
 /* ─── Global Reset ─────────────────────────────────── */
 * {
   box-sizing: border-box;
@@ -23,14 +28,27 @@ html, body {
 }
 
 body {
-  background: #0f172a;
-  color: #f1f5f9;
+  background: #FFFFFF;
+  color: #111111;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Mobile ───────────────────────────────────────── */
-@media (max-width: 480px) {
-  input, select, textarea {
-    font-size: 16px !important;
-  }
+/* ─── Scrollbar Styling (Optional) ──────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F4F4F4;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
 }

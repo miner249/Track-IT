@@ -1,0 +1,125 @@
+/* ═══════════════════════════════════════════════════════
+   MY LIVE BETS STYLES
+   ═══════════════════════════════════════════════════════ */
+
+.live-bets-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.live-bet-card {
+  border-left: 4px solid var(--color-status-live);
+}
+
+.live-bet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+  gap: var(--spacing-sm);
+}
+
+.live-bet-code {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-secondary);
+}
+
+.live-match-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.live-teams {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: var(--color-bg-section);
+  border-radius: var(--border-radius-md);
+}
+
+.live-team {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  flex: 1;
+  min-width: 0;
+}
+
+.live-team:last-child {
+  text-align: right;
+}
+
+.live-score {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-extrabold);
+  color: var(--color-status-win);
+  background: white;
+  padding: 4px 16px;
+  border-radius: var(--border-radius-md);
+  border: 2px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.live-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-size-sm);
+}
+
+.live-league {
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+}
+
+.live-status {
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  font-size: var(--font-size-xs);
+}
+
+.live-selection {
+  background: var(--color-bg-section);
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--color-border);
+  margin-top: var(--spacing-xs);
+}
+
+.selection-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-right: var(--spacing-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.selection-value {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ─── Responsive ──────────────────────────────────────── */
+@media (max-width: 480px) {
+  .live-teams {
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    text-align: center;
+  }
+  
+  .live-team {
+    text-align: center !important;
+  }
+  
+  .live-score {
+    font-size: var(--font-size-lg);
+    padding: 4px 12px;
+  }
+}

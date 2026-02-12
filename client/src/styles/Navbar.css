@@ -1,0 +1,36 @@
+/* ═══════════════════════════════════════════════════════
+   NAVBAR STYLES
+   ═══════════════════════════════════════════════════════ */
+
+.navbar {
+  width: 100%;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E5E7EB;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navbar svg {
+  display: block;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .navbar svg {
+    height: 60px;
+  }
+  
+  .navbar svg text {
+    font-size: 20px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar svg {
+    height: 50px;
+  }
+}
