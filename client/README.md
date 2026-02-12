@@ -1,16 +1,104 @@
-# React + Vite
+# ⚡ TRACK IT
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> A modern SportyBet betting tracker with real-time match updates
 
-Currently, two official plugins are available:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🎯 What It Does
 
-## Expanding the ESLint configuration
+Track your SportyBet bets, monitor live matches in real-time, and view today's football schedule—all in one clean interface.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+
+## ⚡ Quick Start
+
+```bash
+# Install
+npm install
+
+# Run
+npm run dev
+
+# Build
+npm run build
+```
+
+---
+
+## 🎨 Features
+
+✅ **Track Bets** - Add SportyBet share codes and monitor your slips  
+🔴 **Live Updates** - Real-time scores for your tracked bets  
+📅 **Match Schedule** - View today's fixtures and results  
+📱 **Mobile Ready** - Responsive design that works everywhere  
+
+---
+
+## 📁 File Structure
+
+```
+src/
+├── components/
+│   ├── Navbar.jsx
+│   ├── MyLiveBets.jsx
+│   └── ScheduledMatches.jsx
+├── styles/
+│   ├── design.css        # Design system
+│   └── *.css             # Component styles
+├── App.jsx
+└── main.jsx
+```
+
+---
+
+## 🔌 API Endpoints Required
+
+Your backend needs:
+
+```
+GET    /bets              # All tracked bets
+POST   /track-bet         # Add new bet
+GET    /bets/:id          # Bet details
+DELETE /bets/:id          # Remove bet
+GET    /api/live-matches           # Live matches
+GET    /api/tracked-live-matches   # User's live bets
+GET    /api/today-matches          # Today's schedule
+```
+
+---
+
+## 🎨 Design
+
+- **Colors**: White (#FFFFFF), Royal Blue (#0052CC), Green (#16A34A)
+- **Font**: Inter
+- **Style**: Clean, modern, minimal
+
+---
+
+## 📱 Mobile First
+
+Optimized for all screen sizes with responsive breakpoints at 768px and 480px.
+
+---
+
+## 🚀 Tech Stack
+
+React 18 • Vite • Vanilla CSS • REST API
+
+---
+
+## 📄 License
+
+MIT © 2024
+
+---
+
+## 🤝 Contributing
+
+PRs welcome! Fork, create a feature branch, and submit.
+
+---
+
+⭐ **Star this repo if you find it useful!**
