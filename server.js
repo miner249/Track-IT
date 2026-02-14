@@ -7,7 +7,7 @@ const path = require('path');
 const fetch = require('node-fetch');
 const fs = require('fs');
 
-const { getLiveMatches, getTodayMatchesCached, getMatchDetails } = require('./lib/matchApi');
+const { getLiveMatches, getTodayMatchesCached, getMatchDetails } = require('./lib/api');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
