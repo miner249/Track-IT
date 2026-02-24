@@ -72,10 +72,20 @@ async function bootstrap() {
     res.json({ success: true, ...snapshot, cache: false });
   });
 
-  app.get('/schedule', async (_, res) => {
-    const snapshot = await liveDataProvider.fetchScheduleSnapshot();
+  app.get('/schedule', async (req_, res) => {
+    try {
+     const snapshot = await liveDataProvider.fetchScheduleSnapshot();
+      
     res.json({ success: true, ...snapshot });
-  });
+    }catch (error) {
+     console.error('Schedule fetch failed:', error);
+
+    res.status(500).json({
+      success: false,
+      error: 'failed to fetch schedule'
+    });
+   }   
+});
 
   app.post('/subscribe', async (req, res) => {
     const { betId, channel, target } = req.body;
