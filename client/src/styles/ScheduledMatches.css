@@ -37,23 +37,73 @@
   background: var(--color-accent-hover);
 }
 
+/* ─── Matches Container ───────────────────────────────── */
 .matches-container {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
 }
 
+/* ─── League Grouping ─────────────────────────────────── */
+.league-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+}
+
+.league-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--color-bg-section, #F3F4F6);
+  border-radius: var(--border-radius-md);
+  border-left: 4px solid var(--color-accent);
+  margin-bottom: 4px;
+}
+
+.league-name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.league-count {
+  background: var(--color-accent, #3B82F6);
+  color: white;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  padding: 2px 8px;
+  border-radius: 999px;
+  min-width: 24px;
+  text-align: center;
+}
+
+/* ─── Match Card ──────────────────────────────────────── */
 .schedule-match-card {
   position: relative;
   width: 100%;
   text-align: left;
   border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  background: white;
+  transition: all var(--transition-base);
+}
+
+.schedule-match-card:hover {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-sm, 0 1px 4px rgba(0,0,0,0.08));
+  transform: translateY(-1px);
 }
 
 .match-live {
-  border-left: 4px solid var(--color-status-live);
+  border-left: 4px solid var(--color-status-live, #EF4444);
 }
 
+/* ─── Match Header ────────────────────────────────────── */
 .schedule-match-header {
   display: flex;
   justify-content: space-between;
@@ -63,11 +113,14 @@
 }
 
 .schedule-league {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
+/* ─── Teams & Score ───────────────────────────────────── */
 .schedule-teams {
   display: flex;
   flex-direction: column;
@@ -90,6 +143,9 @@
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .schedule-score {
@@ -97,8 +153,10 @@
   font-weight: var(--font-weight-extrabold);
   min-width: 30px;
   text-align: right;
+  color: var(--color-status-win, #16A34A);
 }
 
+/* ─── Match Time ──────────────────────────────────────── */
 .schedule-match-time {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
@@ -107,14 +165,42 @@
   border-top: 1px solid var(--color-border);
 }
 
+/* ─── Live pulse animation ────────────────────────────── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+.badge-live {
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
 /* ─── Responsive ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .league-header {
+    padding: 6px 10px;
+  }
+
+  .league-name {
+    font-size: var(--font-size-xs);
+  }
+}
+
 @media (max-width: 480px) {
   .filters-container {
     gap: 6px;
   }
-  
+
   .filter-btn {
     font-size: var(--font-size-xs);
     padding: 6px 10px;
+  }
+
+  .schedule-team-name {
+    font-size: var(--font-size-sm);
+  }
+
+  .schedule-score {
+    font-size: var(--font-size-lg);
   }
 }
