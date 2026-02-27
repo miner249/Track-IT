@@ -10,6 +10,8 @@
 }
 
 .filter-btn {
+  display: flex;
+  align-items: center;
   padding: var(--spacing-xs) var(--spacing-md);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
@@ -35,6 +37,39 @@
 
 .filter-btn-active:hover {
   background: var(--color-accent-hover);
+}
+
+/* ─── Filter Count Badges ─────────────────────────────── */
+.filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.1);
+  color: inherit;
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  margin-left: 6px;
+}
+
+.filter-btn-active .filter-count {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.filter-count-live {
+  background: var(--color-status-live, #EF4444);
+  color: white;
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+/* ─── Last Updated ────────────────────────────────────── */
+.last-updated {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
 }
 
 /* ─── Matches Container ───────────────────────────────── */
@@ -91,11 +126,12 @@
   border-radius: var(--border-radius-md);
   background: white;
   transition: all var(--transition-base);
+  cursor: pointer;
 }
 
 .schedule-match-card:hover {
   border-color: var(--color-accent);
-  box-shadow: var(--shadow-sm, 0 1px 4px rgba(0,0,0,0.08));
+  box-shadow: var(--shadow-sm, 0 1px 4px rgba(0, 0, 0, 0.08));
   transform: translateY(-1px);
 }
 
@@ -165,12 +201,55 @@
   border-top: 1px solid var(--color-border);
 }
 
-/* ─── Live pulse animation ────────────────────────────── */
+/* ─── Loading ─────────────────────────────────────────── */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-2xl) 0;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ─── Empty State ─────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: var(--spacing-2xl) var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.empty-icon {
+  font-size: 48px;
+}
+
+.empty-text {
+  font-size: var(--font-size-base);
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+/* ─── Animations ──────────────────────────────────────── */
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.5; }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Live badge pulse ────────────────────────────────── */
 .badge-live {
   animation: pulse 1.8s ease-in-out infinite;
 }
@@ -183,6 +262,10 @@
 
   .league-name {
     font-size: var(--font-size-xs);
+  }
+
+  .last-updated {
+    display: none;
   }
 }
 
