@@ -39,32 +39,24 @@ async function bootstrap() {
     res.json({
       status:    'ok',
       platforms: getSupportedPlatforms(),
-      realtime:  'SSE  (/events)',
-      db:        'memory (see database/postgres.schema.sql for PostgreSQL schema)',
+      realtime:  'SSE (/events)',
+      db:        'in-memory',
     });
   });
 
   // ──────────────────────────────────────────────────────────────
-  // Track a bet  (accepts shareCode OR bookingCode + platform)
+  // Track a bet
   // ──────────────────────────────────────────────────────────────
   app.post('/track-bet', async (req, res) => {
     try {
-      // Accept either shareCode (frontend) or bookingCode (legacy)
-      const shareCode   = req.body.shareCode   || req.body.bookingCode;
-      const platform    = req.body.platform;
+      const shareCode = req.body.shareCode || req.body.bookingCode;
+      const platform  = req.body.platform;
 
       if (!shareCode) {
-        return res.status(400).json({
-          success: false,
-          error:   'shareCode is required',
-        });
+        return res.status(400).json({ success: false, error: 'shareCode is required' });
       }
-
       if (!platform) {
-        return res.status(400).json({
-          success: false,
-          error:   'platform is required',
-        });
+        return res.status(400).json({ success: false, error: 'platform is required' });
       }
 
       const parser = getParser(platform);
@@ -77,16 +69,28 @@ async function bootstrap() {
 
       console.log(`🔍 [/track-bet] ${platform.toUpperCase()} — ${shareCode}`);
 
-      const selections = await parser.parse(shareCode);
-      const bet        = await store.insertBet({
+      const result = await parser.parse(shareCode);
+
+      // Support parsers that return a plain array or an object
+      const selections   = Array.isArray(result) ? result : (result.selections || result.matches || []);
+      const totalOdds    = result.totalOdds    || 0;
+      const stake        = result.stake        || 0;
+      const potentialWin = result.potentialWin || 0;
+      const currency     = result.currency     || 'NGN';
+
+      const bet = await store.insertBet({
         bookingCode: shareCode,
-        shareCode,
         platform,
         selections,
+        totalOdds,
+        stake,
+        potentialWin,
+        currency,
       });
-      await store.addEventLog({ event_type: 'bet_tracked', payload: bet });
 
+      await store.addEventLog({ event_type: 'bet_tracked', payload: bet });
       realtime.emit('bet:tracked', bet);
+
       res.json({ success: true, bet });
 
     } catch (error) {
