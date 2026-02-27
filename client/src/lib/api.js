@@ -16,17 +16,41 @@ export async function fetchMatchDetails(id) {
 }
 
 export function getMatchStatusLabel(match) {
-  const status = match?.status;
+  const status     = match?.status;
   const statusTime = match?.status_time;
+  const startTime  = match?.start_time;
 
-  if (status === 'Live' || status === 'IN_PLAY') {
-    if (statusTime && statusTime.includes('Half')) return 'HALF TIME';
-    return statusTime || status || 'Live';
+  if (status === 'IN_PLAY' || status === 'Live') {
+    if (statusTime && statusTime.toLowerCase().includes('half')) return 'HALF TIME';
+    return statusTime || 'LIVE';
   }
 
-  if (status === 'Finished' || status === 'FINISHED') return 'FT';
+  if (status === 'PAUSED') return 'HALF TIME';
 
-  if (!status) return match?.start_time || 'TBD';
+  if (status === 'FINISHED' || status === 'Finished') return 'FT';
 
-  return statusTime || status;
+  if (status === 'POSTPONED')  return 'POSTPONED';
+  if (status === 'CANCELLED')  return 'CANCELLED';
+  if (status === 'SUSPENDED')  return 'SUSPENDED';
+
+  // Not started yet — show kick-off time in local time
+  if (status === 'TIMED' || status === 'SCHEDULED') {
+    if (!startTime) return 'TBD';
+    return new Date(startTime).toLocaleTimeString('en-NG', {
+      hour:   '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  }
+
+  // Fallback — if we have a start time but no known status, show time
+  if (!status && startTime) {
+    return new Date(startTime).toLocaleTimeString('en-NG', {
+      hour:   '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  }
+
+  return statusTime || status || 'TBD';
 }
