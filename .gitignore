@@ -42,4 +42,4 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
-*.swo
+*.swonode_modules/
