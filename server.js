@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors    = require('cors');
+const path    = require('path');
 const EventEmitter = require('events');
 
 const { getParser, getSupportedPlatforms } = require('./parsers');
@@ -15,7 +16,6 @@ const PORT = process.env.PORT || 3000;
 async function bootstrap() {
   const app      = express();
   const realtime = new EventEmitter();
-  // Prevent Node from crashing on unhandled listener warnings for large deployments
   realtime.setMaxListeners(50);
 
   const store         = createStore();
@@ -33,13 +33,13 @@ async function bootstrap() {
   app.use(express.json());
 
   // ──────────────────────────────────────────────────────────────
-  // Root  (fixes "Cannot GET /" on Render)
+  // Root
   // ──────────────────────────────────────────────────────────────
   app.get('/', (_, res) => {
     res.json({
-      name:     'TrackIT API',
-      status:   'running',
-      version:  '1.0.0',
+      name:    'TrackIT API',
+      status:  'running',
+      version: '1.0.0',
       endpoints: {
         'GET  /':          'This menu',
         'GET  /health':    'Health check + supported platforms',
@@ -117,10 +117,8 @@ async function bootstrap() {
       if (cached.matches.length) {
         return res.json({ success: true, ...cached, cache: true });
       }
-
       const snapshot = await liveDataProvider.fetchLiveSnapshot();
       res.json({ success: true, ...snapshot, cache: false });
-
     } catch (error) {
       console.error('❌ [GET /live]', error.message);
       res.status(500).json({ success: false, error: 'Failed to fetch live snapshot' });
@@ -171,13 +169,12 @@ async function bootstrap() {
   });
 
   // ──────────────────────────────────────────────────────────────
-  // SSE  –  Server-Sent Events stream
+  // SSE – Server-Sent Events stream
   // ──────────────────────────────────────────────────────────────
   app.get('/events', (req, res) => {
-    res.setHeader('Content-Type',  'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection',    'keep-alive');
-    // Needed for some proxies / Render
+    res.setHeader('Content-Type',      'text/event-stream');
+    res.setHeader('Cache-Control',     'no-cache');
+    res.setHeader('Connection',        'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
@@ -186,15 +183,14 @@ async function bootstrap() {
       res.write(`data: ${JSON.stringify(payload)}\n\n`);
     };
 
-    const onLive      = (payload) => send('live:update',    payload);
-    const onBet       = (payload) => send('bet:tracked',    payload);
-    const onBetLive   = (payload) => send('bet:live-update', payload);
+    const onLive    = (payload) => send('live:update',    payload);
+    const onBet     = (payload) => send('bet:tracked',    payload);
+    const onBetLive = (payload) => send('bet:live-update', payload);
 
     realtime.on('live:update',     onLive);
     realtime.on('bet:tracked',     onBet);
     realtime.on('bet:live-update', onBetLive);
 
-    // Heartbeat every 25 s to keep the connection alive through proxies
     const heartbeat = setInterval(() => {
       res.write(': heartbeat\n\n');
     }, 25_000);
@@ -210,68 +206,69 @@ async function bootstrap() {
   });
 
   // ──────────────────────────────────────────────────────────────
+  // API aliases for the frontend
+  // ──────────────────────────────────────────────────────────────
+  app.get('/api/live', async (_, res) => {
+    try {
+      const snapshot = await liveDataProvider.fetchLiveSnapshot();
+      res.json({ success: true, ...snapshot });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.get('/api/today', async (_, res) => {
+    try {
+      const snapshot = await liveDataProvider.fetchScheduleSnapshot();
+      res.json({ success: true, ...snapshot });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.get('/api/match/:id', async (req, res) => {
+    try {
+      const snapshot = await liveDataProvider.fetchLiveSnapshot();
+      const match = (snapshot.matches || []).find(m => String(m.id) === String(req.params.id));
+      if (!match) return res.status(404).json({ success: false, error: 'Match not found' });
+      res.json({ success: true, match });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.get('/api/tracked-live-matches', async (_, res) => {
+    try {
+      const bets = await store.getBets();
+      const snapshot = await liveDataProvider.fetchLiveSnapshot();
+      const liveMatches = snapshot.matches || [];
+      const matches = bets.flatMap(bet =>
+        (bet.selections || []).map(sel => {
+          const live = liveMatches.find(m =>
+            m.home_team?.includes(sel.home_team) || m.away_team?.includes(sel.away_team)
+          );
+          if (!live) return null;
+          return { shareCode: bet.bookingCode, match: live, marketName: sel.market_name, selection: sel.selection };
+        }).filter(Boolean)
+      );
+      res.json({ success: true, matches });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // Serve React frontend
+  // ──────────────────────────────────────────────────────────────
+  app.use(express.static(path.join(__dirname, 'client/dist')));
+  app.get('*', (_, res) => {
+    res.sendFile(path.join(__dirname, 'client/dist', 'index.html'));
+  });
+
+  // ──────────────────────────────────────────────────────────────
   // Start
   // ──────────────────────────────────────────────────────────────
-  const path = require('path');
-
-// ── API aliases the frontend expects ──────────────────
-app.get('/api/live', async (_, res) => {
-  try {
-    const snapshot = await liveDataProvider.fetchLiveSnapshot();
-    res.json({ success: true, ...snapshot });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-app.get('/api/today', async (_, res) => {
-  try {
-    const snapshot = await liveDataProvider.fetchScheduleSnapshot();
-    res.json({ success: true, ...snapshot });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-app.get('/api/match/:id', async (req, res) => {
-  try {
-    const snapshot = await liveDataProvider.fetchLiveSnapshot();
-    const match = (snapshot.matches || []).find(m => String(m.id) === String(req.params.id));
-    if (!match) return res.status(404).json({ success: false, error: 'Match not found' });
-    res.json({ success: true, match });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-app.get('/api/tracked-live-matches', async (_, res) => {
-  try {
-    const bets = await store.getBets();
-    const snapshot = await liveDataProvider.fetchLiveSnapshot();
-    const liveMatches = snapshot.matches || [];
-    const matches = bets.flatMap(bet =>
-      (bet.selections || []).map(sel => {
-        const live = liveMatches.find(m =>
-          m.home_team?.includes(sel.home_team) || m.away_team?.includes(sel.away_team)
-        );
-        if (!live) return null;
-        return { shareCode: bet.bookingCode, match: live, marketName: sel.market_name, selection: sel.selection };
-      }).filter(Boolean)
-    );
-    res.json({ success: true, matches });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-// ── Serve React frontend ───────────────────────────────
-app.use(express.static(path.join(__dirname, 'client/dist')));
-app.get('*', (_, res) => {
-  res.sendFile(path.join(__dirname, 'client/dist', 'index.html'));
-});
-```
-
-liveEngine.start();
+  liveEngine.start();
 
   app.listen(PORT, () => {
     console.log(`TrackIT backend listening on http://localhost:${PORT}`);
