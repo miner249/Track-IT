@@ -261,7 +261,7 @@ async function bootstrap() {
   // Serve React frontend
   // ──────────────────────────────────────────────────────────────
   app.use(express.static(path.join(__dirname, 'client/dist')));
-  app.get('*', (_, res) => {
+  app.get('/{*splat}', (_, res) => {
     res.sendFile(path.join(__dirname, 'client/dist', 'index.html'));
   });
 
