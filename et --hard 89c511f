@@ -1,0 +1,57 @@
+[33m79ea54f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m Merge pull request #6 from miner249/revert-5-codex/update-codebase-with-multiple-changes-8bx6ve
+[33m880a8ef[m Revert "Avoid lib/api parse crash by adding lib/matchApi and switching server import; add match UI and caching"
+[33m44e6c25[m Merge pull request #5 from miner249/codex/update-codebase-with-multiple-changes-8bx6ve
+[33m31533fc[m Merge branch 'main' into codex/update-codebase-with-multiple-changes-8bx6ve
+[33m672326a[m Avoid startup parse failures by switching server to new matchApi module
+[33mc621cdd[m Merge pull request #4 from miner249/codex/update-codebase-with-multiple-changes-mwaxbb
+[33mc897c2d[m Merge branch 'main' into codex/update-codebase-with-multiple-changes-mwaxbb
+[33m924a545[m Harden Football-Data token lookup to avoid redeclaration startup regressions
+[33m3d7937d[m Merge pull request #3 from miner249/codex/update-codebase-with-multiple-changes-w7myra
+[33mcc133dd[m Merge branch 'main' into codex/update-codebase-with-multiple-changes-w7myra
+[33md3082cc[m Fix Render startup by avoiding duplicate FOOTBALL_DATA identifier
+[33mfaa62a7[m Merge pull request #2 from miner249/codex/update-codebase-with-multiple-changes-xuf7ke
+[33m2f2c190[m Merge branch 'main' into codex/update-codebase-with-multiple-changes-xuf7ke
+[33m429ee7f[m Add Apify API key rotation fallback for live/details fetches
+[33m89c511f[m Merge pull request #1 from miner249/codex/update-codebase-with-multiple-changes
+[33m063bc8c[m Refactor matches tabs, caching APIs, and nav icon sizing
+[33mf856860[m Update README.md
+[33me64b5ef[m Update README.md
+[33m6a70846[m Update README.md
+[33m6e7d780[m Create README.md for Track IT project
+[33m75a9ebe[m chore: Update README.md to reflect project setup and remove outdated content
+[33m42f594a[m Refactor code structure for improved readability and maintainability
+[33m1aa118b[m chore: Update README.md with project overview, features, and setup instructions
+[33mb234a76[m feat: Add My Live Bets and Scheduled Matches components with styling
+[33m13af88b[m feat: add ScheduledMatches component for displaying today's matches with filtering options
+[33m7fbc11e[m fix: update document title to reflect application name "Track-IT"
+[33mecc563b[m refactor: remove App and LiveMatchTracker components along with associated styles and configurations
+[33m5c95267[m fix: update polling interval for live matches to 40 seconds and enhance Apify key management logic
+[33mef85718[m feat: add MyLiveBets component for tracking live bets with auto-refresh functionality
+[33mb17c033[m fix: update Flashscore scraping logic to use underscore field names and adjust polling interval
+[33mdf3c2c9[m fix: improve live match retrieval logic and error handling in getLiveMatches function
+[33mb86ca49[m refactor: remove deprecated encoding modules and related code
+[33mede68db[m feat: implement hybrid live tracking with Apify and Football-Data API
+[33m5cfc045[m feat: integrate Football-Data.org API and add dotenv for environment variables
+[33m0269977[m Refactor code structure for improved readability and maintainability
+[33m9c4e453[m refactor: consolidate global styles into index.css and remove redundant App.css content
+[33m2541abd[m refactor: streamline CSS and enhance mobile responsiveness in App component
+[33md3e3239[m feat: enhance layout and styling for better responsiveness and user experience
+[33m4bbe78c[m feat: enhance UI with new styles and improve bet tracking functionality
+[33mcb0a8a2[m refactor: simplify track-bet endpoint and enhance logging for better debugging
+[33m3cd791e[m fix: remove unnecessary code and improve server structure
+[33me65800d[m feat: improve logging and error handling in track-bet endpoint
+[33m007b6dd[m fix: set NODE_ENV to development in build script for consistency
+[33me61ef6a[m fix: update project names and build scripts in package.json files
+[33md0a98e6[m fix: update catchall handler to use app.use for serving React app
+[33m27980fa[m feat: enhance bet submission process with improved logging and UI updates
+[33mff53fce[m feat: enhance bet tracking functionality with improved UI and logging
+[33m1e316f2[m fix: remove extra space in header title for consistency
+[33mfeb0626[m feat: update bet tracking functionality and improve UI text
+[33m8a39a06[m fix: update header and description text for clarity
+[33m38ca808[m feat: add initial implementation of whatwg-url library
+[33mfd1357d[m fix: update Sportybet API fetch URL to use CORS proxy
+[33mac57972[m feat: add new endpoint to save bet data
+[33m244d56b[m feat: initialize Vite project with React setup
+[33m4a75d79[m fix: correct build path for serving static files
+[33mcb80ea4[m refactor: remove redundant static file serving code
+[33mef8b1e9[m Remove proxy-from-env package and related files; update package-lock.json; modify server route to catch all requests
